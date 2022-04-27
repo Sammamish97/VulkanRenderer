@@ -1,0 +1,1 @@
+Vulkan SDK must located at C drive directory.
