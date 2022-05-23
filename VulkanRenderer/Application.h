@@ -25,9 +25,10 @@
 #include "VulkanDevice.h"
 #include "Mesh.h"
 #include "Camera.h"
+#include "Object.h"
 
-const uint32_t WIDTH = 800;
-const uint32_t HEIGHT = 600;
+const uint32_t WIDTH = 1080;
+const uint32_t HEIGHT = 720;
 
 const std::vector<const char*> validationLayers = { "VK_LAYER_KHRONOS_validation" };
 const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
@@ -40,7 +41,6 @@ const bool enableValidationLayers = true;
 
 struct UniformBufferObject
 {
-	glm::mat4 model;
 	glm::mat4 view;
 	glm::mat4 proj;
 };
@@ -62,8 +62,8 @@ struct SwapChainSupportDetails
 
 struct MouseInfo
 {
-	float lastX = 400.f;
-	float lastY = 300.f;
+	float lastX = 540;
+	float lastY = 360;
 	bool firstMouse = true;
 };
 
@@ -80,6 +80,14 @@ private:
 	static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
 
 	void initVulkan();
+
+	/*void createDepthResources();
+
+	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags feature);
+
+	VkFormat findDepthFormat();*/
+
+	bool hasStencilComponent(VkFormat format);
 
 	void createDescriptorPool();
 
@@ -154,7 +162,7 @@ private:
 	bool checkValidationLayerSupport();
 
 	/**/
-	void loadMesh();
+	void loadMeshAndObjects();
 
 	void createCamera();
 
@@ -179,7 +187,10 @@ private:
 
 public:
 	VulkanDevice* vulkanDevice;
-	Mesh* mesh;
+	Mesh* redMesh;
+	Mesh* greenMesh;
+	Mesh* BlueMesh;
+	std::vector<Object*> objects;
 	Camera* camera;
 	MouseInfo mouseInfo;
 
@@ -218,6 +229,10 @@ private:
 	std::vector<VkFramebuffer> swapChainFramebuffers;
 	std::vector<VkImage> swapChainImages;
 	std::vector<VkImageView> swapChainImageViews;
+
+	/*VkImage depthImage;
+	VkDeviceMemory depthImageMemory;
+	VkImageView dpethImageView;*/
 
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;

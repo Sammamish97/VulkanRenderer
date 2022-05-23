@@ -37,7 +37,7 @@ std::array<VkVertexInputAttributeDescription, 2> Vertex::getAttributeDescription
 
 /*******************************************************************/
 
-bool Mesh::loadFromObj(const char* filename)
+bool Mesh::loadFromObj(const char* filename, glm::vec3 assignedColor)
 {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -84,10 +84,8 @@ bool Mesh::loadFromObj(const char* filename)
 			position.y = attrib.vertices[vertex_idx * 3 + 1];
 			position.z = attrib.vertices[vertex_idx * 3 + 2];
 
-			glm::vec3 color{ 0.3f };
-
 			newVertex.position = position;
-			newVertex.color = color;
+			newVertex.color = assignedColor;
 
 			vertices.push_back(newVertex);
 		}
@@ -111,9 +109,9 @@ void Mesh::createIndexBuffer(VulkanDevice* vulkanDevice)
 		bufferSize, &indexBuffer, &indexBufferMemory, indices.data());
 }
 
-bool Mesh::loadAndCreateMesh(const char* filename, VulkanDevice* vulkan_device)
+bool Mesh::loadAndCreateMesh(const char* filename, VulkanDevice* vulkan_device, glm::vec3 assignedColor)
 {
-	loadFromObj(filename);
+	loadFromObj(filename, assignedColor);
 	createVertexBuffer(vulkan_device);
 	createIndexBuffer(vulkan_device);
 	logicalDevice = vulkan_device->logicalDevice;

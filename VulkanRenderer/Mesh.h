@@ -21,8 +21,8 @@ struct Mesh
 public:
 	std::vector<Vertex> vertices;
 	std::vector<uint16_t> indices;
-	bool loadAndCreateMesh(const char* filename, VulkanDevice* vulkan_device);
-	bool loadFromObj(const char* filename);
+	bool loadAndCreateMesh(const char* filename, VulkanDevice* vulkan_device, glm::vec3 assignedColor);
+	bool loadFromObj(const char* filename, glm::vec3 assignedColor);
 	void createVertexBuffer(VulkanDevice* vulkanDevice);
 	void createIndexBuffer(VulkanDevice* vulkanDevice);
 	~Mesh();

@@ -86,7 +86,7 @@ void HelloTriangleApplication::initVulkan()
 	createDescriptorSetLayout();
 	createGraphicsPipeline();
 	createFramebuffers();
-	loadMesh();
+	loadMeshAndObjects();
 	createUniformBuffers();
 	createDescriptorPool();
 	createDescriptorSet();
@@ -148,6 +148,44 @@ void HelloTriangleApplication::createDescriptorSet()
 
 		vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
 	}
+}
+
+//void HelloTriangleApplication::createDepthResources()
+//{
+//	VkFormat depthFormat = findDepthFormat();
+//	
+//}
+//
+//VkFormat HelloTriangleApplication::findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling,
+//	VkFormatFeatureFlags features)
+//{
+//	for(VkFormat format : candidates)
+//	{
+//		VkFormatProperties props;
+//		vkGetPhysicalDeviceFormatProperties(vulkanDevice->physicalDevice, format, &props);
+//
+//		if(tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features)
+//		{
+//			return format;
+//		}
+//		else if(tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features)
+//		{
+//			return format;
+//		}
+//	}
+//	throw std::runtime_error("failed to find supported format!");
+//}
+//
+//VkFormat HelloTriangleApplication::findDepthFormat()
+//{
+//	return findSupportedFormat({ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+//		VK_IMAGE_TILING_OPTIMAL,
+//		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+//}
+
+bool HelloTriangleApplication::hasStencilComponent(VkFormat format)
+{
+	return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
 void HelloTriangleApplication::createUniformBuffers()
@@ -343,10 +381,21 @@ void HelloTriangleApplication::createCommandBuffers()
 	}
 }
 
-void HelloTriangleApplication::loadMesh()
+void HelloTriangleApplication::loadMeshAndObjects()
 {
-	mesh = new Mesh;
-	mesh->loadAndCreateMesh("../models/cube.obj", vulkanDevice);
+	redMesh = new Mesh;
+	redMesh->loadAndCreateMesh("../models/cube.obj", vulkanDevice, glm::vec3(1, 0, 0));
+
+	greenMesh = new Mesh;
+	greenMesh->loadAndCreateMesh("../models/cube.obj", vulkanDevice, glm::vec3(0, 1, 0));
+
+	BlueMesh = new Mesh;
+	BlueMesh->loadAndCreateMesh("../models/cube.obj", vulkanDevice, glm::vec3(0, 0, 1));
+
+
+	objects.push_back(new Object(redMesh, glm::vec3(0.f, 3.f, 0.f)));
+	objects.push_back(new Object(greenMesh, glm::vec3(1.5f, 0.f, 0.f)));
+	objects.push_back(new Object(BlueMesh, glm::vec3(-1.5f, 0.f, 0.f)));
 }
 
 void HelloTriangleApplication::createCamera()
@@ -367,6 +416,11 @@ void HelloTriangleApplication::processInput()
 		camera->ProcessKeyboard(LEFT, deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 		camera->ProcessKeyboard(RIGHT, deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+		camera->ProcessKeyboard(UP, deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+		camera->ProcessKeyboard(DOWN, deltaTime);
+
 }
 
 void HelloTriangleApplication::mouseCallback(GLFWwindow* window, double xposIn, double yposIn)
@@ -416,14 +470,22 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer commandBuffer
 	renderPassInfo.pClearValues = &clearColor;
 
 	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-	VkBuffer vertexBuffers[] = { mesh->vertexBuffer };
-	VkDeviceSize offsets[] = { 0 };
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-	vkCmdBindIndexBuffer(commandBuffer, mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
-	vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mesh->indices.size()), 1, 0, 0, 0);
+	//
+	for(Object* object : objects)
+	{
+		VkBuffer vertexBuffers[] = { object->mMesh->vertexBuffer };
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+		vkCmdBindIndexBuffer(commandBuffer, object->mMesh->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+		glm::mat4 modelMat = object->BuildModelMat();
+		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMat);
+		vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(object->mMesh->indices.size()), 1, 0, 0, 0);
+	}
+	//
+
 	vkCmdEndRenderPass(commandBuffer);
 	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
 	{
@@ -632,12 +694,17 @@ void HelloTriangleApplication::createGraphicsPipeline()
 	dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
 	dynamicState.pDynamicStates = dynamicStates.data();
 
+	VkPushConstantRange pushConstant;
+	pushConstant.offset = 0;
+	pushConstant.size = sizeof(glm::mat4);
+	pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-	pipelineLayoutInfo.pushConstantRangeCount = 0;
-	pipelineLayoutInfo.pPushConstantRanges = nullptr;
+	pipelineLayoutInfo.pushConstantRangeCount = 1;
+	pipelineLayoutInfo.pPushConstantRanges = &pushConstant;
 
 	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
 	{
@@ -771,8 +838,6 @@ void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage)
 	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
 	UniformBufferObject ubo{};
-	//ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.f), glm::vec3(0.f, 0.f, 1.f));
-	ubo.model = glm::identity<glm::mat4>();
 	ubo.view = camera->getViewMatrix();
 	ubo.proj = glm::perspective(glm::radians(45.f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.f);
 	ubo.proj[1][1] *= -1;
@@ -785,7 +850,9 @@ void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage)
 
 void HelloTriangleApplication::cleanup()
 {
-	delete mesh;
+	delete redMesh;
+	delete greenMesh;
+	delete BlueMesh;
 
 	cleanupSwapChain();
 

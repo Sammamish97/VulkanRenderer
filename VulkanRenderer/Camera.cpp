@@ -28,6 +28,10 @@ void Camera::ProcessKeyboard(Camera_Movement direction, float dt)
 		position -= right * velocity;
 	if (direction == RIGHT)
 		position += right * velocity;
+	if (direction == UP)
+		position += up * velocity;
+	if (direction == DOWN)
+		position -= up * velocity;
 }
 
 void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch)
