@@ -81,11 +81,13 @@ private:
 
 	void initVulkan();
 
-	/*void createDepthResources();
+	void createTextureImage();
+
+	void createDepthResources();
 
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags feature);
 
-	VkFormat findDepthFormat();*/
+	VkFormat findDepthFormat();
 
 	bool hasStencilComponent(VkFormat format);
 
@@ -96,8 +98,6 @@ private:
 	void createUniformBuffers();
 
 	void createDescriptorSetLayout();
-
-	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 
@@ -112,6 +112,16 @@ private:
 	void createCommandBuffers();
 
 	void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+
+	VkCommandBuffer beginSingleTimeCommands();
+
+	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+
+	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+
+	void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+
+	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
 	void createFramebuffers();
 
@@ -129,7 +139,16 @@ private:
 
 	void cleanup();
 
+	void createTextureImageView();
+
+	void createTextureSampler();
+
+	VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+
 	void createImageViews();
+
+	void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
+		VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
 
 	void createSwapChain();
 
@@ -216,6 +235,7 @@ private:
 	VkCommandPool commandPool;
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSetLayout descriptorSetLayout;
+	
 
 	std::vector<VkDescriptorSet> descriptorSets;
 	std::vector<VkBuffer> uniformBuffers;
@@ -229,10 +249,15 @@ private:
 	std::vector<VkFramebuffer> swapChainFramebuffers;
 	std::vector<VkImage> swapChainImages;
 	std::vector<VkImageView> swapChainImageViews;
+	
+	VkImage textureImage;
+	VkDeviceMemory textureImageMemory;
+	VkImageView textureImageView;
+	VkSampler textureSampler;
 
-	/*VkImage depthImage;
+	VkImage depthImage;
 	VkDeviceMemory depthImageMemory;
-	VkImageView dpethImageView;*/
+	VkImageView depthImageView;
 
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
