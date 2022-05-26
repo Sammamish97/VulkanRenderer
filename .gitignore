@@ -21,7 +21,7 @@ bin/
 # Compiled Dynamic libraries
 *.so
 *.dylib
-*.dll
+#*.dll DO NOT REMOVE GLFW&OTHER IMPORTANT DYNAMIC LIBRARY
 
 # Fortran module files
 *.mod
