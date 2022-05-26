@@ -26,6 +26,7 @@
 #include "Mesh.h"
 #include "Camera.h"
 #include "Object.h"
+#include "DirLight.h"
 
 const uint32_t WIDTH = 1080;
 const uint32_t HEIGHT = 720;
@@ -185,6 +186,8 @@ private:
 
 	void createCamera();
 
+	void createLight();
+
 	void processInput();
 
 	void FrameStart();
@@ -212,6 +215,8 @@ public:
 	std::vector<Object*> objects;
 	Camera* camera;
 	MouseInfo mouseInfo;
+	DirLight* dirLight;
+	
 
 	std::chrono::system_clock::time_point frameStart;
 	std::chrono::system_clock::time_point frameEnd;
@@ -219,7 +224,6 @@ public:
 
 private:
 	bool framebufferResized = false;
-	const int MAX_FRAMES_IN_FLIGHT = 2;
 	uint32_t currentFrame = 0;
 	VkInstance instance;
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -234,21 +238,24 @@ private:
 	VkPipeline graphicsPipeline;
 	VkCommandPool commandPool;
 	VkDescriptorPool descriptorPool;
+
 	VkDescriptorSetLayout descriptorSetLayout;
-	
+	VkDescriptorSet descriptorSet;
 
-	std::vector<VkDescriptorSet> descriptorSets;
-	std::vector<VkBuffer> uniformBuffers;
-	std::vector<VkDeviceMemory> uniformBuffersMemory;
+	VkBuffer matUniformBuffer;
+	VkDeviceMemory matUniformBuffersMemory;
 
-	std::vector<VkCommandBuffer> commandBuffers;
-	std::vector <VkSemaphore> imageAvailableSemaphores;
-	std::vector <VkSemaphore> renderFinishedSemaphores;
-	std::vector <VkFence> inFlightFences;
+	VkBuffer lightUniformBuffer;
+	VkDeviceMemory lightUniformBuffersMemory;
+
+	VkCommandBuffer commandBuffer;
+	VkSemaphore imageAvailableSemaphore;
+	VkSemaphore renderFinishedSemaphore;
+	VkFence inFlightFence;
 
 	std::vector<VkFramebuffer> swapChainFramebuffers;
-	std::vector<VkImage> swapChainImages;
-	std::vector<VkImageView> swapChainImageViews;
+	std::vector <VkImage> swapChainImages;
+	std::vector <VkImageView> swapChainImageViews;
 	
 	VkImage textureImage;
 	VkDeviceMemory textureImageMemory;

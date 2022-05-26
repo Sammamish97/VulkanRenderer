@@ -85,10 +85,12 @@ void HelloTriangleApplication::initVulkan()
 	createImageViews();
 	createRenderPass();
 	createDescriptorSetLayout();
+
 	createGraphicsPipeline();
 	createDepthResources();
 	createFramebuffers();
 	loadMeshAndObjects();
+	createLight();
 	createUniformBuffers();
 	createDescriptorPool();
 	createDescriptorSet();
@@ -100,16 +102,22 @@ void HelloTriangleApplication::initVulkan()
 
 void HelloTriangleApplication::createDescriptorPool()
 {
-	VkDescriptorPoolSize poolsize{};
-	poolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolsize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+	VkDescriptorPoolSize matPoolsize{};
+	matPoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	matPoolsize.descriptorCount = 1;
+
+	VkDescriptorPoolSize Lightpoolsize{};
+	Lightpoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	Lightpoolsize.descriptorCount = 1;
+
+	std::vector<VkDescriptorPoolSize> poolSizes = { matPoolsize, Lightpoolsize };
 
 	VkDescriptorPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = 1;
-	poolInfo.pPoolSizes = &poolsize;
+	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+	poolInfo.pPoolSizes = poolSizes.data();
 
-	poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+	poolInfo.maxSets = 2;
 
 	if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS)
 	{
@@ -119,37 +127,48 @@ void HelloTriangleApplication::createDescriptorPool()
 
 void HelloTriangleApplication::createDescriptorSet()
 {
-	std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
 	VkDescriptorSetAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	allocInfo.descriptorPool = descriptorPool;
-	allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-	allocInfo.pSetLayouts = layouts.data();
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = &descriptorSetLayout;
 
-	descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-	if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS)
+	if (vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to allocate descriptor sets");
 	}
 
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		VkDescriptorBufferInfo bufferInfo{};
-		bufferInfo.buffer = uniformBuffers[i];
-		bufferInfo.offset = 0;
-		bufferInfo.range = sizeof(UniformBufferObject);
+	VkDescriptorBufferInfo MatbufferInfo{};
+	MatbufferInfo.buffer = matUniformBuffer;
+	MatbufferInfo.offset = 0;
+	MatbufferInfo.range = sizeof(UniformBufferObject);
 
-		VkWriteDescriptorSet descriptorWrite{};
-		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite.dstSet = descriptorSets[i];
-		descriptorWrite.dstBinding = 0;
-		descriptorWrite.dstArrayElement = 0;
-		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrite.descriptorCount = 1;
-		descriptorWrite.pBufferInfo = &bufferInfo;
+	VkDescriptorBufferInfo LightbufferInfo{};
+	LightbufferInfo.buffer = lightUniformBuffer;
+	LightbufferInfo.offset = 0;
+	LightbufferInfo.range = sizeof(DirLight);
 
-		vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
-	}
+
+	VkWriteDescriptorSet MatdescriptorWrite{};
+	MatdescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	MatdescriptorWrite.dstSet = descriptorSet;
+	MatdescriptorWrite.dstBinding = 0;
+	MatdescriptorWrite.dstArrayElement = 0;
+	MatdescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	MatdescriptorWrite.descriptorCount = 1;
+	MatdescriptorWrite.pBufferInfo = &MatbufferInfo;
+
+	VkWriteDescriptorSet LightdescriptorWrite{};
+	LightdescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	LightdescriptorWrite.dstSet = descriptorSet;
+	LightdescriptorWrite.dstBinding = 1;
+	LightdescriptorWrite.dstArrayElement = 0;
+	LightdescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	LightdescriptorWrite.descriptorCount = 1;
+	LightdescriptorWrite.pBufferInfo = &LightbufferInfo;
+
+	std::vector<VkWriteDescriptorSet> writeDescriptorSets = { MatdescriptorWrite, LightdescriptorWrite };
+	vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
 }
 
 void HelloTriangleApplication::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
@@ -405,15 +424,11 @@ bool HelloTriangleApplication::hasStencilComponent(VkFormat format)
 
 void HelloTriangleApplication::createUniformBuffers()
 {
-	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+	VkDeviceSize MatbufferSize = sizeof(UniformBufferObject);
+	createBuffer(MatbufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, matUniformBuffer, matUniformBuffersMemory);
 
-	uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-	uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-	{
-		createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
-	}
+	VkDeviceSize LightbufferSize = sizeof(DirLight);
+	createBuffer(LightbufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, lightUniformBuffer, lightUniformBuffersMemory);
 }
 
 void HelloTriangleApplication::createDescriptorSetLayout()
@@ -425,10 +440,19 @@ void HelloTriangleApplication::createDescriptorSetLayout()
 	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 	uboLayoutBinding.pImmutableSamplers = nullptr;
 
+	VkDescriptorSetLayoutBinding lightLayoutBinding{};
+	lightLayoutBinding.binding = 1;
+	lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	lightLayoutBinding.descriptorCount = 1;
+	lightLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	lightLayoutBinding.pImmutableSamplers = nullptr;
+
+	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = { uboLayoutBinding, lightLayoutBinding };
+
 	VkDescriptorSetLayoutCreateInfo layoutInfo{};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layoutInfo.bindingCount = 1;
-	layoutInfo.pBindings = &uboLayoutBinding;
+	layoutInfo.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
+	layoutInfo.pBindings = setLayoutBindings.data();
 
 	if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
 	{
@@ -528,10 +552,6 @@ void HelloTriangleApplication::recreateSwapChain()
 
 void HelloTriangleApplication::createSyncObjects()
 {
-	imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-	renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-	inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-
 	VkSemaphoreCreateInfo semaphoreInfo{};
 	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -539,29 +559,23 @@ void HelloTriangleApplication::createSyncObjects()
 	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+	if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
+		vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS ||
+		vkCreateFence(device, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS)
 	{
-		if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
-			vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
-			vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS)
-		{
-			throw std::runtime_error("failed to create semaphores!");
-		}
+		throw std::runtime_error("failed to create semaphores!");
 	}
-
 }
 
 void HelloTriangleApplication::createCommandBuffers()
 {
-	commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-
 	VkCommandBufferAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.commandPool = commandPool;
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
+	allocInfo.commandBufferCount = 1;
 
-	if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
+	if (vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to allocate command buffers!");
 	}
@@ -573,20 +587,25 @@ void HelloTriangleApplication::loadMeshAndObjects()
 	redMesh->loadAndCreateMesh("../models/cube.obj", vulkanDevice, glm::vec3(1, 0, 0));
 
 	greenMesh = new Mesh;
-	greenMesh->loadAndCreateMesh("../models/cube.obj", vulkanDevice, glm::vec3(0, 1, 0));
+	greenMesh->loadAndCreateMesh("../models/sphere.obj", vulkanDevice, glm::vec3(0, 1, 0));
 
 	BlueMesh = new Mesh;
-	BlueMesh->loadAndCreateMesh("../models/cube.obj", vulkanDevice, glm::vec3(0, 0, 1));
+	BlueMesh->loadAndCreateMesh("../models/bunny_high_poly.obj", vulkanDevice, glm::vec3(0, 0, 1));
 
 
 	objects.push_back(new Object(redMesh, glm::vec3(0.f, 3.f, 0.f)));
 	objects.push_back(new Object(greenMesh, glm::vec3(1.5f, 0.f, 0.f)));
-	objects.push_back(new Object(BlueMesh, glm::vec3(-1.5f, 0.f, 0.f)));
+	objects.push_back(new Object(BlueMesh, glm::vec3(-1.5f, 0.f, 0.f), glm::vec3(20)));
 }
 
 void HelloTriangleApplication::createCamera()
 {
 	camera = new Camera(glm::vec3(0, 0, 5), glm::vec3(0, 1, 0));
+}
+
+void HelloTriangleApplication::createLight()
+{
+	dirLight = new DirLight(glm::vec4(1.f, 0.f, 0.f, 1.f), glm::vec4(-0.5f, -0.5f, -0.5f, -0.5f));
 }
 
 void HelloTriangleApplication::processInput()
@@ -661,7 +680,7 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer commandBuffer
 	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 	//
 	for(Object* object : objects)
 	{
@@ -703,7 +722,6 @@ void HelloTriangleApplication::createFramebuffers()
 			throw std::runtime_error("failed to create framebuffer!");
 		}
 	}
-
 }
 
 void HelloTriangleApplication::createRenderPass()
@@ -770,7 +788,6 @@ void HelloTriangleApplication::createRenderPass()
 	{
 		throw std::runtime_error("failed to create render pass!");
 	}
-
 }
 
 VkShaderModule HelloTriangleApplication::createShaderModule(const std::vector<char>& code)
@@ -975,10 +992,10 @@ void HelloTriangleApplication::mainLoop()
 
 void HelloTriangleApplication::drawFrame()
 {
-	vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+	vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
 
 	uint32_t imageindex;
-	VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageindex);
+	VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageindex);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
 	{
@@ -993,28 +1010,28 @@ void HelloTriangleApplication::drawFrame()
 
 	updateUniformBuffer(currentFrame);
 
-	vkResetFences(device, 1, &inFlightFences[currentFrame]);
+	vkResetFences(device, 1, &inFlightFence);
 
-	vkResetCommandBuffer(commandBuffers[currentFrame], 0);
-	recordCommandBuffer(commandBuffers[currentFrame], imageindex);
+	vkResetCommandBuffer(commandBuffer, 0);
+	recordCommandBuffer(commandBuffer, imageindex);
 
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-	VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
+	VkSemaphore waitSemaphores[] = { imageAvailableSemaphore };
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = waitSemaphores;
 	submitInfo.pWaitDstStageMask = waitStages;
 
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
+	submitInfo.pCommandBuffers = &commandBuffer;
 
-	VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
+	VkSemaphore signalSemaphores[] = { renderFinishedSemaphore };
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
-	if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS)
+	if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to submit draw command buffer!");
 	}
@@ -1043,8 +1060,6 @@ void HelloTriangleApplication::drawFrame()
 	{
 		throw std::runtime_error("failed to acquire swap chain image!");
 	}
-
-	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage)
@@ -1059,10 +1074,15 @@ void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage)
 	ubo.proj = glm::perspective(glm::radians(45.f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.f);
 	ubo.proj[1][1] *= -1;
 
-	void* data;
-	vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
-	memcpy(data, &ubo, sizeof(ubo));
-	vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
+	void* Matdata;
+	vkMapMemory(device, matUniformBuffersMemory, 0, sizeof(ubo), 0, &Matdata);
+	memcpy(Matdata, &ubo, sizeof(ubo));
+	vkUnmapMemory(device, matUniformBuffersMemory);
+
+	void* Lightdata;
+	vkMapMemory(device, lightUniformBuffersMemory, 0, sizeof(DirLight), 0, &Lightdata);
+	memcpy(Lightdata, dirLight, sizeof(DirLight));
+	vkUnmapMemory(device, lightUniformBuffersMemory);
 }
 
 void HelloTriangleApplication::cleanup()
@@ -1079,23 +1099,20 @@ void HelloTriangleApplication::cleanup()
 	vkDestroyImage(device, textureImage, nullptr);
 	vkFreeMemory(device, textureImageMemory, nullptr);
 
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-	{
-		vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-		vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
-	}
+	vkDestroyBuffer(device, matUniformBuffer, nullptr);
+	vkFreeMemory(device, matUniformBuffersMemory, nullptr);
+
+	vkDestroyBuffer(device, lightUniformBuffer, nullptr);
+	vkFreeMemory(device, lightUniformBuffersMemory, nullptr);
+	
 	vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 
 	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-	{
-		vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
-		vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-		vkDestroyFence(device, inFlightFences[i], nullptr);
-	}
+	vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
+	vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
+	vkDestroyFence(device, inFlightFence, nullptr);
 
-	
 	if (enableValidationLayers)
 	{
 		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);

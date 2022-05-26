@@ -12,9 +12,14 @@ void Object::Draw()
 
 glm::mat4 Object::BuildModelMat() const
 {
-	glm::mat4 scale = glm::scale(glm::identity<glm::mat4>(), mScale);
-	//glm::mat4 rotation = glm::rotate();
-	glm::mat4 translate = glm::translate(scale, mPosition);
+	//glm::mat4 scale = glm::scale(glm::identity<glm::mat4>(), mScale);
+	////glm::mat4 rotation = glm::rotate();
+	//glm::mat4 translate = glm::translate(scale, mPosition);
 
-	return translate;
+	glm::mat4 translate = glm::translate(glm::identity<glm::mat4>(), mPosition);
+	glm::mat4 scale = glm::scale(translate, mScale);
+	//glm::mat4 rotation = glm::rotate();
+	
+
+	return scale;
 }
