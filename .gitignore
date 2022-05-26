@@ -4,11 +4,14 @@
 # Prerequisites
 *.d
 
+# Compiled Object folder
+VulkanRenderer/x64
+
 # Compiled Object files
 *.slo
 *.lo
 *.o
-*.obj
+#*.obj DO NOT REMOVE OBJ MODEL FILE
 
 # Precompiled Headers
 *.gch
@@ -27,7 +30,7 @@
 *.lai
 *.la
 *.a
-*.lib
+#*.lib DO NOT REMOVE GLFW&OTHER IMPORTANT LIBRARY
 
 # Executables
 *.exe
