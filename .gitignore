@@ -5,7 +5,8 @@
 *.d
 
 # Compiled Object folder
-VulkanRenderer/x64
+VulkanRenderer/x64/
+bin/
 
 # Compiled Object files
 *.slo
