@@ -44,12 +44,14 @@ struct UniformBufferObject
 {
 	glm::mat4 view;
 	glm::mat4 proj;
+	glm::vec3 lookVec;
 };
 
 struct UniformBufferLights
 {
 	DirLight dir_light[3];
 };
+
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
@@ -174,7 +176,7 @@ private:
 
 	void createDeviceModule();
 
-	void pickPhysicalDevice();
+	VkPhysicalDevice pickPhysicalDevice();
 
 	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 
@@ -230,41 +232,49 @@ public:
 private:
 	bool framebufferResized = false;
 	uint32_t currentFrame = 0;
+
 	VkInstance instance;
-	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-	VkDevice device;
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
+
 	VkDebugUtilsMessengerEXT debugMessenger;
+
 	VkSurfaceKHR surface;
 	VkSwapchainKHR swapChain;
 	VkRenderPass renderPass;
+
 	VkPipelineLayout pipelineLayout;
+
 	VkPipeline graphicsPipeline;
-	VkCommandPool commandPool;
 
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorSet descriptorSet;
 
 	VkCommandBuffer commandBuffer;
+
+	//Synchronize
 	VkSemaphore imageAvailableSemaphore;
 	VkSemaphore renderFinishedSemaphore;
 	VkFence inFlightFence;
 
+	//Swap chain
 	std::vector<VkFramebuffer> swapChainFramebuffers;
 	std::vector <VkImage> swapChainImages;
 	std::vector <VkImageView> swapChainImageViews;
 	
+	//Texture
 	VkImage textureImage;
 	VkDeviceMemory textureImageMemory;
 	VkImageView textureImageView;
 	VkSampler textureSampler;
 
+	//Depth
 	VkImage depthImage;
 	VkDeviceMemory depthImageMemory;
 	VkImageView depthImageView;
 
+	//Swap chain
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
 	GLFWwindow* window = nullptr;
