@@ -444,7 +444,7 @@ void HelloTriangleApplication::createDescriptorSetLayout()
 	lightLayoutBinding.binding = 1;
 	lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	lightLayoutBinding.descriptorCount = 1;
-	lightLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	lightLayoutBinding.pImmutableSamplers = nullptr;
 
 	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = { uboLayoutBinding, lightLayoutBinding };
@@ -584,18 +584,18 @@ void HelloTriangleApplication::createCommandBuffers()
 void HelloTriangleApplication::loadMeshAndObjects()
 {
 	redMesh = new Mesh;
-	redMesh->loadAndCreateMesh("../models/cube.obj", vulkanDevice, glm::vec3(1, 0, 0));
+	redMesh->loadAndCreateMesh("../models/Sphere.obj", vulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
 	greenMesh = new Mesh;
-	greenMesh->loadAndCreateMesh("../models/sphere.obj", vulkanDevice, glm::vec3(0, 1, 0));
+	greenMesh->loadAndCreateMesh("../models/Sphere.obj", vulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
 	BlueMesh = new Mesh;
-	BlueMesh->loadAndCreateMesh("../models/bunny_high_poly.obj", vulkanDevice, glm::vec3(0, 0, 1));
+	BlueMesh->loadAndCreateMesh("../models/Sphere.obj", vulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
 
 	objects.push_back(new Object(redMesh, glm::vec3(0.f, 3.f, 0.f)));
 	objects.push_back(new Object(greenMesh, glm::vec3(1.5f, 0.f, 0.f)));
-	objects.push_back(new Object(BlueMesh, glm::vec3(-1.5f, 0.f, 0.f), glm::vec3(20)));
+	objects.push_back(new Object(BlueMesh, glm::vec3(-1.5f, 0.f, 0.f)));
 }
 
 void HelloTriangleApplication::createCamera()
@@ -605,7 +605,7 @@ void HelloTriangleApplication::createCamera()
 
 void HelloTriangleApplication::createLight()
 {
-	dirLight = new DirLight(glm::vec4(1.f, 0.f, 0.f, 1.f), glm::vec4(-0.5f, -0.5f, -0.5f, -0.5f));
+	dirLight = new DirLight(glm::vec4(0.8f, 0.8f, 0.8f, 1.f), glm::vec4(-0.5f, -0.5f, -0.5f, -0.5f));
 }
 
 void HelloTriangleApplication::processInput()
@@ -687,10 +687,9 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer commandBuffer
 		VkBuffer vertexBuffers[] = { object->mMesh->vertexBuffer };
 		VkDeviceSize offsets[] = { 0 };
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-		vkCmdBindIndexBuffer(commandBuffer, object->mMesh->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 		glm::mat4 modelMat = object->BuildModelMat();
 		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMat);
-		vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(object->mMesh->indices.size()), 1, 0, 0, 0);
+		vkCmdDraw(commandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
 	}
 	//
 

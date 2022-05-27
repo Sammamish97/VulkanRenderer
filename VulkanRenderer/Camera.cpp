@@ -3,7 +3,7 @@
 #include <iostream>
 
 Camera::Camera(glm::vec3 pos, glm::vec3 up, float yaw, float pitch)
-	:front(glm::vec3(0.f, 0.f, -1.f)), MovementSpeed(2.5f), MouseSensitivity(0.1f)
+	:front(glm::vec3(0.f, 0.f, -1.f)), MovementSpeed(2.5f), MouseSensitivity(0.25f)
 {
 	position = pos;
 	worldUp = up;

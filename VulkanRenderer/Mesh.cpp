@@ -14,9 +14,9 @@ VkVertexInputBindingDescription Vertex::getBindingDescription()
 	return bindingDescription;
 }
 
-std::array<VkVertexInputAttributeDescription, 2> Vertex::getAttributeDescriptions()
+std::array<VkVertexInputAttributeDescription, 3> Vertex::getAttributeDescriptions()
 {
-	std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+	std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
 	attributeDescriptions[0].binding = 0;
 	attributeDescriptions[0].location = 0;
 	attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -27,10 +27,10 @@ std::array<VkVertexInputAttributeDescription, 2> Vertex::getAttributeDescription
 	attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 	attributeDescriptions[1].offset = offsetof(Vertex, color);
 
-	/*attributeDescriptions[2].binding = 0;
+	attributeDescriptions[2].binding = 0;
 	attributeDescriptions[2].location = 2;
 	attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[2].offset = offsetof(Vertex, normal);*/
+	attributeDescriptions[2].offset = offsetof(Vertex, normal);
 
 	return attributeDescriptions;
 }
@@ -59,35 +59,46 @@ bool Mesh::loadFromObj(const char* filename, glm::vec3 assignedColor)
 		return false;
 	}
 
-	for(size_t shape_idx = 0; shape_idx < shapes.size(); ++shape_idx)
-	{
-		size_t indexOffset = 0;
-		for(size_t face_idx = 0; face_idx < shapes[shape_idx].mesh.num_face_vertices.size(); ++face_idx)
-		{
+	// Loop over shapes
+	for (size_t s = 0; s < shapes.size(); s++) {
+		// Loop over faces(polygon)
+		size_t index_offset = 0;
+		for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+
+			//hardcode loading to triangles
 			int fv = 3;
 
-			for(size_t v = 0; v < fv; ++v)
-			{
-				tinyobj::index_t idx = shapes[shape_idx].mesh.indices[indexOffset + v];
-				indices.push_back(idx.vertex_index);
+			// Loop over vertices in the face.
+			for (size_t v = 0; v < fv; v++) {
+				// access to vertex
+				tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+
+				//vertex position
+				tinyobj::real_t vx = attrib.vertices[3 * idx.vertex_index + 0];
+				tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
+				tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
+				//vertex normal
+				tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
+				tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
+				tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
+
+				//copy it into our vertex
+				Vertex new_vert;
+				new_vert.position.x = vx;
+				new_vert.position.y = vy;
+				new_vert.position.z = vz;
+
+				new_vert.normal.x = nx;
+				new_vert.normal.y = ny;
+				new_vert.normal.z = nz;
+
+				//we are setting the vertex color as the vertex normal. This is just for display purposes
+				new_vert.color = assignedColor;
+
+
+				vertices.push_back(new_vert);
 			}
-			indexOffset += fv;
-		}
-
-		size_t vertex_num = attrib.vertices.size() / 3.f;
-		for(size_t vertex_idx = 0; vertex_idx < vertex_num; ++vertex_idx)
-		{
-			Vertex newVertex;
-
-			glm::vec3 position;
-			position.x = attrib.vertices[vertex_idx * 3 + 0];
-			position.y = attrib.vertices[vertex_idx * 3 + 1];
-			position.z = attrib.vertices[vertex_idx * 3 + 2];
-
-			newVertex.position = position;
-			newVertex.color = assignedColor;
-
-			vertices.push_back(newVertex);
+			index_offset += fv;
 		}
 	}
 	return true;
@@ -101,19 +112,11 @@ void Mesh::createVertexBuffer(VulkanDevice* vulkanDevice)
 		bufferSize, &vertexBuffer, &vertexBufferMemory, vertices.data());
 }
 
-void Mesh::createIndexBuffer(VulkanDevice* vulkanDevice)
-{
-	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
-
-	vulkanDevice->createBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		bufferSize, &indexBuffer, &indexBufferMemory, indices.data());
-}
 
 bool Mesh::loadAndCreateMesh(const char* filename, VulkanDevice* vulkan_device, glm::vec3 assignedColor)
 {
 	loadFromObj(filename, assignedColor);
 	createVertexBuffer(vulkan_device);
-	createIndexBuffer(vulkan_device);
 	logicalDevice = vulkan_device->logicalDevice;
 	return true;
 }
@@ -122,6 +125,4 @@ Mesh::~Mesh()
 {
 	vkDestroyBuffer(logicalDevice, vertexBuffer, nullptr);
 	vkFreeMemory(logicalDevice, vertexBufferMemory, nullptr);
-	vkDestroyBuffer(logicalDevice, indexBuffer, nullptr);
-	vkFreeMemory(logicalDevice, indexBufferMemory, nullptr);
 }
