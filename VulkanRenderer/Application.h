@@ -46,6 +46,11 @@ struct UniformBufferObject
 	glm::mat4 proj;
 };
 
+struct UniformBufferLights
+{
+	DirLight dir_light[3];
+};
+
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
 	VkDebugUtilsMessengerEXT* pDebugMessenger);
@@ -205,8 +210,6 @@ private:
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData);
 
-	
-
 public:
 	VulkanDevice* vulkanDevice;
 	Mesh* redMesh;
@@ -215,8 +218,10 @@ public:
 	std::vector<Object*> objects;
 	Camera* camera;
 	MouseInfo mouseInfo;
-	DirLight* dirLight;
-	
+	UniformBufferLights lightsData;
+
+	Buffer matUBO;
+	Buffer lightUBO;
 
 	std::chrono::system_clock::time_point frameStart;
 	std::chrono::system_clock::time_point frameEnd;
@@ -237,16 +242,10 @@ private:
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
 	VkCommandPool commandPool;
-	VkDescriptorPool descriptorPool;
 
+	VkDescriptorPool descriptorPool;
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorSet descriptorSet;
-
-	VkBuffer matUniformBuffer;
-	VkDeviceMemory matUniformBuffersMemory;
-
-	VkBuffer lightUniformBuffer;
-	VkDeviceMemory lightUniformBuffersMemory;
 
 	VkCommandBuffer commandBuffer;
 	VkSemaphore imageAvailableSemaphore;

@@ -1,6 +1,5 @@
 #include "DirLight.h"
-
-DirLight::DirLight(glm::vec4 color, glm::vec4 dir)
+DirLight::DirLight(glm::vec3 color, glm::vec3 dir)
 	:mColor(color), mDir(dir)
 {
 }

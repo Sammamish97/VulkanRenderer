@@ -5,16 +5,30 @@ layout(location = 1) in vec3 fragNormal;
 
 layout(location = 0) out vec4 outColor;
 
-layout(binding = 1) uniform DirLight {
-    vec4 color;
-    vec4 dir;
+struct DirLight {
+	vec3 color;
+    float pad;
+	vec3 dir;
+    float pad2;
+};
+
+layout (binding = 1) uniform DirLightsUBO {
+    DirLight dirlights[3];
 } dirLight;
 
 void main() {
-    vec3 norm_l = vec3(normalize(dirLight.dir));
+   
     vec3 norm_n = normalize(fragNormal);
-    float diff = max(dot(norm_l, norm_n), 0.1);
-    vec3 diffuse = diff * vec3(dirLight.color);
-    vec3 result = fragColor * diffuse;
+    
+    vec3 result = vec3(0, 0, 0);
+    
+    for(int i = 0; i < 3; ++i)
+    {
+        vec3 norm_l = normalize(dirLight.dirlights[i].dir);
+        float diff = max(dot(norm_l, norm_n), 0.1);
+        vec3 diffuse = diff * dirLight.dirlights[i].color;
+        result += fragColor * diffuse;
+    }
+
     outColor = vec4(result, 1.0f);
 }

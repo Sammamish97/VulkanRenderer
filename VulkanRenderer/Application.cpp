@@ -139,14 +139,14 @@ void HelloTriangleApplication::createDescriptorSet()
 	}
 
 	VkDescriptorBufferInfo MatbufferInfo{};
-	MatbufferInfo.buffer = matUniformBuffer;
+	MatbufferInfo.buffer = matUBO.buffer;
 	MatbufferInfo.offset = 0;
 	MatbufferInfo.range = sizeof(UniformBufferObject);
 
 	VkDescriptorBufferInfo LightbufferInfo{};
-	LightbufferInfo.buffer = lightUniformBuffer;
+	LightbufferInfo.buffer = lightUBO.buffer;
 	LightbufferInfo.offset = 0;
-	LightbufferInfo.range = sizeof(DirLight);
+	LightbufferInfo.range = sizeof(UniformBufferLights);
 
 
 	VkWriteDescriptorSet MatdescriptorWrite{};
@@ -425,10 +425,10 @@ bool HelloTriangleApplication::hasStencilComponent(VkFormat format)
 void HelloTriangleApplication::createUniformBuffers()
 {
 	VkDeviceSize MatbufferSize = sizeof(UniformBufferObject);
-	createBuffer(MatbufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, matUniformBuffer, matUniformBuffersMemory);
+	vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &matUBO, MatbufferSize);
 
-	VkDeviceSize LightbufferSize = sizeof(DirLight);
-	createBuffer(LightbufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, lightUniformBuffer, lightUniformBuffersMemory);
+	VkDeviceSize LightbufferSize = sizeof(lightsData);
+	vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &lightUBO, LightbufferSize);
 }
 
 void HelloTriangleApplication::createDescriptorSetLayout()
@@ -584,13 +584,13 @@ void HelloTriangleApplication::createCommandBuffers()
 void HelloTriangleApplication::loadMeshAndObjects()
 {
 	redMesh = new Mesh;
-	redMesh->loadAndCreateMesh("../models/Sphere.obj", vulkanDevice, glm::vec3(0.5, 0.5, 0.5));
+	redMesh->loadAndCreateMesh("../models/Sphere.obj", vulkanDevice, glm::vec3(0.1, 0.1, 0.1));
 
 	greenMesh = new Mesh;
 	greenMesh->loadAndCreateMesh("../models/Sphere.obj", vulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
 	BlueMesh = new Mesh;
-	BlueMesh->loadAndCreateMesh("../models/Sphere.obj", vulkanDevice, glm::vec3(0.5, 0.5, 0.5));
+	BlueMesh->loadAndCreateMesh("../models/Sphere.obj", vulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
 
 	objects.push_back(new Object(redMesh, glm::vec3(0.f, 3.f, 0.f)));
@@ -605,7 +605,9 @@ void HelloTriangleApplication::createCamera()
 
 void HelloTriangleApplication::createLight()
 {
-	dirLight = new DirLight(glm::vec4(0.8f, 0.8f, 0.8f, 1.f), glm::vec4(-0.5f, -0.5f, -0.5f, -0.5f));
+	lightsData.dir_light[0] = DirLight(glm::vec3(0.8f, 0.1f, 0.1f), glm::vec3(-0.5f, -0.5f, -0.5f));
+	lightsData.dir_light[1] = DirLight(glm::vec3(0.1f, 0.1f, 0.8), glm::vec3(0.5f, 0.5f, 0.5f));
+	lightsData.dir_light[2] = DirLight(glm::vec3(0.3f, 0.3f, 0.3f), glm::vec3(-0.5f, 0.5f, 0.5f));
 }
 
 void HelloTriangleApplication::processInput()
@@ -1074,14 +1076,14 @@ void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage)
 	ubo.proj[1][1] *= -1;
 
 	void* Matdata;
-	vkMapMemory(device, matUniformBuffersMemory, 0, sizeof(ubo), 0, &Matdata);
+	vkMapMemory(device, matUBO.memory, 0, sizeof(ubo), 0, &Matdata);
 	memcpy(Matdata, &ubo, sizeof(ubo));
-	vkUnmapMemory(device, matUniformBuffersMemory);
+	vkUnmapMemory(device, matUBO.memory);
 
 	void* Lightdata;
-	vkMapMemory(device, lightUniformBuffersMemory, 0, sizeof(DirLight), 0, &Lightdata);
-	memcpy(Lightdata, dirLight, sizeof(DirLight));
-	vkUnmapMemory(device, lightUniformBuffersMemory);
+	vkMapMemory(device, lightUBO.memory, 0, sizeof(UniformBufferLights), 0, &Lightdata);
+	memcpy(Lightdata, &lightsData, sizeof(lightsData));
+	vkUnmapMemory(device, lightUBO.memory);
 }
 
 void HelloTriangleApplication::cleanup()
@@ -1098,12 +1100,9 @@ void HelloTriangleApplication::cleanup()
 	vkDestroyImage(device, textureImage, nullptr);
 	vkFreeMemory(device, textureImageMemory, nullptr);
 
-	vkDestroyBuffer(device, matUniformBuffer, nullptr);
-	vkFreeMemory(device, matUniformBuffersMemory, nullptr);
+	matUBO.destroy();
+	lightUBO.destroy();
 
-	vkDestroyBuffer(device, lightUniformBuffer, nullptr);
-	vkFreeMemory(device, lightUniformBuffersMemory, nullptr);
-	
 	vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 
 	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);

@@ -167,6 +167,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Object.cpp" />
+    <ClCompile Include="PointLight.cpp" />
     <ClCompile Include="VulkanBuffer.cpp" />
     <ClCompile Include="VulkanDevice.cpp" />
     <ClCompile Include="VulkanTools.cpp" />
@@ -177,6 +178,7 @@
     <ClInclude Include="DirLight.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Object.h" />
+    <ClInclude Include="PointLight.h" />
     <ClInclude Include="VulkanBuffer.h" />
     <ClInclude Include="VulkanDevice.h" />
     <ClInclude Include="VulkanTools.h" />
