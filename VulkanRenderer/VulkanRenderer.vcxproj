@@ -181,6 +181,7 @@
     <ClInclude Include="PointLight.h" />
     <ClInclude Include="VulkanBuffer.h" />
     <ClInclude Include="VulkanDevice.h" />
+    <ClInclude Include="VulkanInitializers.hpp" />
     <ClInclude Include="VulkanTools.h" />
   </ItemGroup>
   <ItemGroup>

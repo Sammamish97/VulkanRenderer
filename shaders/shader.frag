@@ -23,7 +23,7 @@ void main() {
     
     vec3 result = vec3(0, 0, 0);
     
-    for(int i = 0; i < 1; ++i)
+    for(int i = 0; i < 3; ++i)
     {
         vec3 norm_l = normalize(dirLight.dirlights[i].dir);
         float diff = max(dot(norm_l, norm_n), 0.1);

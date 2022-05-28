@@ -1,6 +1,13 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "Application.h"
+#include "VulkanTools.h"
+#include "VulkanInitializers.hpp"
 #include <stb_image.h>
+
+#define TEX_DIM 2048
+#define TEX_FILTER VK_FILTER_LINEAR
+#define FB_DIM TEX_DIM
+
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
 	VkDebugUtilsMessengerEXT* pDebugMessenger)
@@ -107,7 +114,7 @@ void HelloTriangleApplication::createDescriptorPool()
 
 	VkDescriptorPoolSize Lightpoolsize{};
 	Lightpoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	Lightpoolsize.descriptorCount = 1;
+	Lightpoolsize.descriptorCount = 1;//TODO: 왜 1인지, 어떻게 돌아가는지 알아야함.
 
 	std::vector<VkDescriptorPoolSize> poolSizes = { matPoolsize, Lightpoolsize };
 
@@ -132,42 +139,60 @@ void HelloTriangleApplication::createDescriptorSet()
 	allocInfo.descriptorSetCount = 1;
 	allocInfo.pSetLayouts = &descriptorSetLayout;
 
-	if (vkAllocateDescriptorSets(vulkanDevice->logicalDevice, &allocInfo, &descriptorSet) != VK_SUCCESS)
+	VkDescriptorImageInfo texPosDisc;
+	texPosDisc.sampler = colorSampler;
+	texPosDisc.imageView = GBuffer.position.view;
+	texPosDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkDescriptorImageInfo texNormalDisc;
+	texPosDisc.sampler = colorSampler;
+	texPosDisc.imageView = GBuffer.position.view;
+	texPosDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkDescriptorImageInfo texColorDisc;
+	texPosDisc.sampler = colorSampler;
+	texPosDisc.imageView = GBuffer.position.view;
+	texPosDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	// Deferred composition
+	if (vkAllocateDescriptorSets(vulkanDevice->logicalDevice, &allocInfo, &LightingDescriptorSet) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to allocate descriptor sets");
 	}
-
-	VkDescriptorBufferInfo MatbufferInfo{};
-	MatbufferInfo.buffer = matUBO.buffer;
-	MatbufferInfo.offset = 0;
-	MatbufferInfo.range = sizeof(UniformBufferObject);
 
 	VkDescriptorBufferInfo LightbufferInfo{};
 	LightbufferInfo.buffer = lightUBO.buffer;
 	LightbufferInfo.offset = 0;
 	LightbufferInfo.range = sizeof(UniformBufferLights);
 
+	std::vector<VkWriteDescriptorSet> lightWriteDescriptorSets;
+	lightWriteDescriptorSets = {
+		initializers::writeDescriptorSet(LightingDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &texPosDisc),
+		initializers::writeDescriptorSet(LightingDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &texNormalDisc),
+		initializers::writeDescriptorSet(LightingDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &texColorDisc),
+		initializers::writeDescriptorSet(LightingDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4, &LightbufferInfo)
+	};
 
-	VkWriteDescriptorSet MatdescriptorWrite{};
-	MatdescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	MatdescriptorWrite.dstSet = descriptorSet;
-	MatdescriptorWrite.dstBinding = 0;
-	MatdescriptorWrite.dstArrayElement = 0;
-	MatdescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	MatdescriptorWrite.descriptorCount = 1;
-	MatdescriptorWrite.pBufferInfo = &MatbufferInfo;
+	vkUpdateDescriptorSets(vulkanDevice->logicalDevice, static_cast<uint32_t>(lightWriteDescriptorSets.size()), lightWriteDescriptorSets.data(), 0, nullptr);
 
-	VkWriteDescriptorSet LightdescriptorWrite{};
-	LightdescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	LightdescriptorWrite.dstSet = descriptorSet;
-	LightdescriptorWrite.dstBinding = 1;
-	LightdescriptorWrite.dstArrayElement = 0;
-	LightdescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	LightdescriptorWrite.descriptorCount = 1;
-	LightdescriptorWrite.pBufferInfo = &LightbufferInfo;
+	// G-Buffer description
 
-	std::vector<VkWriteDescriptorSet> writeDescriptorSets = { MatdescriptorWrite, LightdescriptorWrite };
-	vkUpdateDescriptorSets(vulkanDevice->logicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+	if (vkAllocateDescriptorSets(vulkanDevice->logicalDevice, &allocInfo, &GBufferDescriptorSet) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to allocate descriptor sets");
+	}
+
+	VkDescriptorBufferInfo GBufferInfo{};
+	GBufferInfo.buffer = matUBO.buffer;
+	GBufferInfo.offset = 0;
+	GBufferInfo.range = sizeof(UniformBufferObject);
+
+	std::vector<VkWriteDescriptorSet> GBufWriteDescriptorSets;
+	GBufWriteDescriptorSets = {
+		initializers::writeDescriptorSet(GBufferDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &GBufferInfo)
+	};
+	
+	vkUpdateDescriptorSets(vulkanDevice->logicalDevice, static_cast<uint32_t>(GBufWriteDescriptorSets.size()), GBufWriteDescriptorSets.data(), 0, nullptr);
 }
 
 void HelloTriangleApplication::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
@@ -432,6 +457,7 @@ void HelloTriangleApplication::createUniformBuffers()
 
 void HelloTriangleApplication::createDescriptorSetLayout()
 {
+	//Binding 0: view/projection mat & view vector
 	VkDescriptorSetLayoutBinding uboLayoutBinding{};
 	uboLayoutBinding.binding = 0;
 	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -439,6 +465,7 @@ void HelloTriangleApplication::createDescriptorSetLayout()
 	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 	uboLayoutBinding.pImmutableSamplers = nullptr;
 
+	//Binding 1: view/projection mat & view vector
 	VkDescriptorSetLayoutBinding lightLayoutBinding{};
 	lightLayoutBinding.binding = 1;
 	lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -446,7 +473,28 @@ void HelloTriangleApplication::createDescriptorSetLayout()
 	lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	lightLayoutBinding.pImmutableSamplers = nullptr;
 
-	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = { uboLayoutBinding, lightLayoutBinding };
+	VkDescriptorSetLayoutBinding positionTextureBinding{};
+	lightLayoutBinding.binding = 2;
+	lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	lightLayoutBinding.descriptorCount = 1;
+	lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	lightLayoutBinding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutBinding normalTextureBinding{};
+	lightLayoutBinding.binding = 3;
+	lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	lightLayoutBinding.descriptorCount = 1;
+	lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	lightLayoutBinding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutBinding albedoTextureBinding{};
+	lightLayoutBinding.binding = 4;
+	lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	lightLayoutBinding.descriptorCount = 1;
+	lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	lightLayoutBinding.pImmutableSamplers = nullptr;
+
+	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = { uboLayoutBinding, lightLayoutBinding,positionTextureBinding, normalTextureBinding, albedoTextureBinding };
 
 	VkDescriptorSetLayoutCreateInfo layoutInfo{};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -511,7 +559,9 @@ void HelloTriangleApplication::cleanupSwapChain()
 		vkDestroyFramebuffer(vulkanDevice->logicalDevice, swapChainFramebuffers[i], nullptr);
 	}
 
-	vkDestroyPipeline(vulkanDevice->logicalDevice, graphicsPipeline, nullptr);
+	vkDestroyPipeline(vulkanDevice->logicalDevice, GBufferPipeline, nullptr);
+	vkDestroyPipeline(vulkanDevice->logicalDevice, LightingPipeline, nullptr);
+
 	vkDestroyPipelineLayout(vulkanDevice->logicalDevice, pipelineLayout, nullptr);
 	vkDestroyRenderPass(vulkanDevice->logicalDevice, renderPass, nullptr);
 
@@ -583,13 +633,13 @@ void HelloTriangleApplication::createCommandBuffers()
 void HelloTriangleApplication::loadMeshAndObjects()
 {
 	redMesh = new Mesh;
-	redMesh->loadAndCreateMesh("../models/Sphere.obj", vulkanDevice, glm::vec3(0.1, 0.1, 0.1));
+	redMesh->loadAndCreateMesh("../models/Sphere.obj", vulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
 	greenMesh = new Mesh;
-	greenMesh->loadAndCreateMesh("../models/Sphere.obj", vulkanDevice, glm::vec3(0.5, 0.5, 0.5));
+	greenMesh->loadAndCreateMesh("../models/Monkey.obj", vulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
 	BlueMesh = new Mesh;
-	BlueMesh->loadAndCreateMesh("../models/Sphere.obj", vulkanDevice, glm::vec3(0.8, 0.8, 0.8));
+	BlueMesh->loadAndCreateMesh("../models/Torus.obj", vulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
 
 	objects.push_back(new Object(redMesh, glm::vec3(0.f, 3.f, 0.f)));
@@ -604,9 +654,9 @@ void HelloTriangleApplication::createCamera()
 
 void HelloTriangleApplication::createLight()
 {
-	lightsData.dir_light[0] = DirLight(glm::vec3(0.8f, 0.1f, 0.1f), glm::vec3(-0.5f, -0.5f, -0.5f));
-	lightsData.dir_light[1] = DirLight(glm::vec3(0.1f, 0.1f, 0.8), glm::vec3(0.5f, 0.5f, 0.5f));
-	lightsData.dir_light[2] = DirLight(glm::vec3(0.3f, 0.3f, 0.3f), glm::vec3(-0.5f, 0.5f, 0.5f));
+	lightsData.dir_light[0] = DirLight(glm::vec3(0.1f, 0.5f, 0.1f), glm::vec3(-0.5f, -0.5f, -0.5f));
+	lightsData.dir_light[1] = DirLight(glm::vec3(0.5f, 0.1f, 0.1), glm::vec3(0.5f, 0.5f, 0.5f));
+	lightsData.dir_light[2] = DirLight(glm::vec3(0.1f, 0.1f, 0.5f), glm::vec3(-0.5f, 0.5f, 0.5f));
 }
 
 void HelloTriangleApplication::processInput()
@@ -699,6 +749,20 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer commandBuffer
 	{
 		throw std::runtime_error("failed to record command buffer!");
 	}
+}
+
+void HelloTriangleApplication::BuildGCommandBuffers()
+{
+	VkCommandBufferBeginInfo cmdBufInfo = initializers::commandBufferBeginInfo();
+
+	VkClearValue clearValues[2];
+	clearValues[0].color = { {0.f, 0.f, 0.2f, 0.f} };
+	clearValues[1].depthStencil = { 1.f, 0.f };
+	//TODO: Start from here. 
+}
+
+void HelloTriangleApplication::BuildLightingCommandsBuffers()
+{
 }
 
 void HelloTriangleApplication::createFramebuffers()
@@ -807,26 +871,6 @@ VkShaderModule HelloTriangleApplication::createShaderModule(const std::vector<ch
 
 void HelloTriangleApplication::createGraphicsPipeline()
 {
-	auto vertShaderCode = readFile("../shaders/vert.spv");
-	auto fragShaderCode = readFile("../shaders/frag.spv");
-
-	VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
-	VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
-
-	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	vertShaderStageInfo.module = vertShaderModule;
-	vertShaderStageInfo.pName = "main";
-
-	VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
-	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragShaderStageInfo.module = fragShaderModule;
-	fragShaderStageInfo.pName = "main";
-
-	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
-
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 
 	auto bindingDescription = Vertex::getBindingDescription();
@@ -837,6 +881,9 @@ void HelloTriangleApplication::createGraphicsPipeline()
 	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
 	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
 	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+	VkPipelineVertexInputStateCreateInfo vertexEmptyInputInfo{};
+	vertexEmptyInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
 	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -868,7 +915,7 @@ void HelloTriangleApplication::createGraphicsPipeline()
 	rasterizer.rasterizerDiscardEnable = VK_FALSE;
 	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizer.lineWidth = 1.0f;
-	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
 	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizer.depthBiasEnable = VK_FALSE;
 	rasterizer.depthBiasConstantFactor = 0.f;
@@ -945,12 +992,40 @@ void HelloTriangleApplication::createGraphicsPipeline()
 		throw std::runtime_error("failed to create pipeline layout!");
 	}
 
+	auto GBufferVertexShaderCode = readFile("../shaders/vert.spv");
+	auto GBufferFragShaderCode = readFile("../shaders/frag.spv");
+
+	auto lightingVertexShaderCode = readFile("../shaders/vert.spv");
+	auto lightingFragmentShaderCode = readFile("../shaders/frag.spv");
+
+	VkShaderModule GBufferVertShaderModule = createShaderModule(GBufferVertexShaderCode);
+	VkShaderModule GBufferFragShaderModule = createShaderModule(GBufferFragShaderCode);
+
+	VkShaderModule lightingVertShaderModule = createShaderModule(lightingVertexShaderCode);
+	VkShaderModule lightingFragShaderModule = createShaderModule(lightingFragmentShaderCode);
+
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = lightingVertShaderModule;
+	vertShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = lightingFragShaderModule;
+	fragShaderStageInfo.pName = "main";
+
+	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
+	shaderStages[0] = vertShaderStageInfo;
+	shaderStages[1] = fragShaderStageInfo;
+
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipelineInfo.stageCount = 2;
-	pipelineInfo.pStages = shaderStages;
+	pipelineInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
+	pipelineInfo.pStages = shaderStages.data();
 
-	pipelineInfo.pVertexInputState = &vertexInputInfo;
+	pipelineInfo.pVertexInputState = &vertexEmptyInputInfo;
 	pipelineInfo.pInputAssemblyState = &inputAssembly;
 	pipelineInfo.pViewportState = &viewportState;
 	pipelineInfo.pRasterizationState = &rasterizer;
@@ -967,13 +1042,39 @@ void HelloTriangleApplication::createGraphicsPipeline()
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 	pipelineInfo.basePipelineIndex = -1;
 
-	if (vkCreateGraphicsPipelines(vulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
+	if (vkCreateGraphicsPipelines(vulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &LightingPipeline) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to create graphics pipeline!");
 	}
 
-	vkDestroyShaderModule(vulkanDevice->logicalDevice, fragShaderModule, nullptr);
-	vkDestroyShaderModule(vulkanDevice->logicalDevice, vertShaderModule, nullptr);
+	pipelineInfo.pVertexInputState = &vertexInputInfo;
+	pipelineInfo.renderPass = GBuffer.renderPass;
+	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+	vertShaderStageInfo.module = GBufferVertShaderModule;
+	fragShaderStageInfo.module = GBufferFragShaderModule;
+	shaderStages[0] = vertShaderStageInfo;
+	shaderStages[1] = fragShaderStageInfo;
+
+	VkPipelineColorBlendAttachmentState colorBlendState;
+	colorBlendState.colorWriteMask = 0xf;
+	colorBlendState.blendEnable = false;
+
+	std::array<VkPipelineColorBlendAttachmentState, 3> blendAttachmentStates = {
+			colorBlendState, colorBlendState, colorBlendState
+	};
+
+	colorBlending.attachmentCount = static_cast<uint32_t>(blendAttachmentStates.size());
+	colorBlending.pAttachments = blendAttachmentStates.data();
+
+	vkDestroyShaderModule(vulkanDevice->logicalDevice, GBufferFragShaderModule, nullptr);
+	vkDestroyShaderModule(vulkanDevice->logicalDevice, GBufferFragShaderModule, nullptr);
+	vkDestroyShaderModule(vulkanDevice->logicalDevice, lightingVertShaderModule, nullptr);
+	vkDestroyShaderModule(vulkanDevice->logicalDevice, lightingFragShaderModule, nullptr);
+
+	if (vkCreateGraphicsPipelines(vulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &GBufferPipeline) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to create graphics pipeline!");
+	}
 }
 void HelloTriangleApplication::mainLoop()
 {
@@ -1583,3 +1684,179 @@ void HelloTriangleApplication::FrameEnd()
 	frameEnd = std::chrono::system_clock::now();
 	deltaTime = std::chrono::duration<float>(frameEnd - frameStart).count();
 }
+
+void HelloTriangleApplication::createAttachment(VkFormat format, VkImageUsageFlagBits usage,
+	FrameBufferAttachment* attachment)
+{
+	VkImageAspectFlags aspectMask = 0;
+	VkImageLayout imageLayout;
+
+	attachment->format = format;
+
+	if(usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+	{
+		aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	}
+	if(usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+	{
+		aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	}
+
+	assert(aspectMask > 0);
+
+	VkImageCreateInfo image{};
+	image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	image.imageType = VK_IMAGE_TYPE_2D;
+	image.format = format;
+	image.extent.width = GBuffer.width;
+	image.extent.height = GBuffer.height;
+	image.extent.depth = 1;
+	image.mipLevels = 1;
+	image.arrayLayers = 1;
+	image.samples = VK_SAMPLE_COUNT_1_BIT;
+	image.tiling = VK_IMAGE_TILING_OPTIMAL;
+	image.usage = usage | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+	VkMemoryAllocateInfo memAlloc{};
+	memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+
+	VkMemoryRequirements memReqs;
+
+	VK_CHECK_RESULT(vkCreateImage(vulkanDevice->logicalDevice, &image, nullptr, &attachment->image));
+	vkGetImageMemoryRequirements(vulkanDevice->logicalDevice, attachment->image, &memReqs);
+	memAlloc.allocationSize = memReqs.size;
+	memAlloc.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	VK_CHECK_RESULT(vkAllocateMemory(vulkanDevice->logicalDevice, &memAlloc, nullptr, &attachment->memory));
+	VK_CHECK_RESULT(vkBindImageMemory(vulkanDevice->logicalDevice, attachment->image, attachment->memory, 0));
+
+	VkImageViewCreateInfo imageView{};
+	imageView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	imageView.format = format;
+	imageView.subresourceRange = {};
+	imageView.subresourceRange.aspectMask = aspectMask;
+	imageView.subresourceRange.baseMipLevel = 0;
+	imageView.subresourceRange.levelCount = 1;
+	imageView.subresourceRange.baseArrayLayer = 0;
+	imageView.subresourceRange.layerCount = 1;
+	imageView.image = attachment->image;
+	VK_CHECK_RESULT(vkCreateImageView(vulkanDevice->logicalDevice, &imageView, nullptr, &attachment->view));
+}
+
+void HelloTriangleApplication::PrepareGBuffer()
+{
+	GBuffer.width = FB_DIM;
+	GBuffer.height = FB_DIM;
+
+	createAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &GBuffer.position);
+	createAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &GBuffer.normal);
+	createAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &GBuffer.albedo);
+
+	VkFormat attachmentDepthFormat = findDepthFormat();
+
+	createAttachment(attachmentDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &GBuffer.depth);
+
+	std::array<VkAttachmentDescription, 4> attachmentDescs{};
+
+	for(uint32_t i = 0; i < 4; ++i)
+	{
+		attachmentDescs[i].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachmentDescs[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		attachmentDescs[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachmentDescs[i].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachmentDescs[i].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		if(i == 3)
+		{
+			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		}
+		else
+		{
+			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		}
+	}
+
+	attachmentDescs[0].format = GBuffer.position.format;
+	attachmentDescs[1].format = GBuffer.normal.format;
+	attachmentDescs[2].format = GBuffer.albedo.format;
+	attachmentDescs[3].format = GBuffer.depth.format;
+
+	std::vector<VkAttachmentReference> colorReferences;
+	colorReferences.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+	colorReferences.push_back({ 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+	colorReferences.push_back({ 2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+
+	VkAttachmentReference depthReference = {};
+	depthReference.attachment = 3;
+	depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.pColorAttachments = colorReferences.data();
+	subpass.colorAttachmentCount = static_cast<uint32_t>(colorReferences.size());
+	subpass.pDepthStencilAttachment = &depthReference;
+
+	std::array<VkSubpassDependency, 2> dependencies;
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	dependencies[1].srcSubpass = 0;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	VkRenderPassCreateInfo renderPassInfo = {};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassInfo.pAttachments = attachmentDescs.data();
+	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachmentDescs.size());
+	renderPassInfo.subpassCount = 1;
+	renderPassInfo.pSubpasses = &subpass;
+	renderPassInfo.dependencyCount = 2;
+	renderPassInfo.pDependencies = dependencies.data();
+
+	VK_CHECK_RESULT(vkCreateRenderPass(vulkanDevice->logicalDevice, &renderPassInfo, nullptr, &GBuffer.renderPass));
+
+	std::array<VkImageView, 4> attachments;
+	attachments[0] = GBuffer.position.view;
+	attachments[1] = GBuffer.normal.view;
+	attachments[2] = GBuffer.albedo.view;
+	attachments[3] = GBuffer.depth.view;
+
+	VkFramebufferCreateInfo frameBufferCreateInfo = {};
+	frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	frameBufferCreateInfo.pNext = nullptr;
+	frameBufferCreateInfo.renderPass = GBuffer.renderPass;
+	frameBufferCreateInfo.pAttachments = attachments.data();
+	frameBufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+	frameBufferCreateInfo.width = GBuffer.width;
+	frameBufferCreateInfo.height = GBuffer.height;
+	frameBufferCreateInfo.layers = 1;
+	VK_CHECK_RESULT(vkCreateFramebuffer(vulkanDevice->logicalDevice, &frameBufferCreateInfo, nullptr, &GBuffer.framebuffer));
+
+	VkSamplerCreateInfo sampler = {};
+	sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	sampler.maxAnisotropy = 1.f;
+	sampler.magFilter = VK_FILTER_NEAREST;
+	sampler.minFilter = VK_FILTER_NEAREST;
+	sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sampler.addressModeV = sampler.addressModeU;
+	sampler.addressModeW = sampler.addressModeU;
+	sampler.mipLodBias = 0.0f;
+	sampler.maxAnisotropy = 1.0f;
+	sampler.minLod = 0.0f;
+	sampler.maxLod = 1.0f;
+	sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+	VK_CHECK_RESULT(vkCreateSampler(vulkanDevice->logicalDevice, &sampler, nullptr, &colorSampler));
+}
+

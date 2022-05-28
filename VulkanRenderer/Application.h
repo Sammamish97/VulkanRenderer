@@ -75,6 +75,23 @@ struct MouseInfo
 	bool firstMouse = true;
 };
 
+struct FrameBufferAttachment
+{
+	VkImage image;
+	VkDeviceMemory memory;
+	VkImageView view;
+	VkFormat format;
+};
+
+struct FrameBuffer
+{
+	int32_t width, height;
+	VkFramebuffer framebuffer;
+	FrameBufferAttachment position, normal, albedo;
+	FrameBufferAttachment depth;
+	VkRenderPass renderPass;
+};
+
 class HelloTriangleApplication
 {
 public:
@@ -197,7 +214,15 @@ private:
 
 	void processInput();
 
+	void createAttachment(VkFormat format, VkImageUsageFlagBits usage, FrameBufferAttachment* attachment);
+
+	void PrepareGBuffer();
+
 	void FrameStart();
+
+	void BuildGCommandBuffers();
+
+	void BuildLightingCommandsBuffers();
 
 	void Update();
 
@@ -225,6 +250,10 @@ public:
 	Buffer matUBO;
 	Buffer lightUBO;
 
+	FrameBuffer GBuffer;
+	FrameBuffer LightBuffer;
+	VkSampler colorSampler;
+
 	std::chrono::system_clock::time_point frameStart;
 	std::chrono::system_clock::time_point frameEnd;
 	float deltaTime;
@@ -245,11 +274,14 @@ private:
 
 	VkPipelineLayout pipelineLayout;
 
-	VkPipeline graphicsPipeline;
+	VkPipeline GBufferPipeline;
+	VkPipeline LightingPipeline;
 
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSetLayout descriptorSetLayout;
-	VkDescriptorSet descriptorSet;
+
+	VkDescriptorSet GBufferDescriptorSet;
+	VkDescriptorSet LightingDescriptorSet;
 
 	VkCommandBuffer commandBuffer;
 
@@ -257,6 +289,8 @@ private:
 	VkSemaphore imageAvailableSemaphore;
 	VkSemaphore renderFinishedSemaphore;
 	VkFence inFlightFence;
+
+	VkSemaphore offscreenSemaphore;
 
 	//Swap chain
 	std::vector<VkFramebuffer> swapChainFramebuffers;
