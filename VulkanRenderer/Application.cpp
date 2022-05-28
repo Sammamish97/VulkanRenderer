@@ -89,21 +89,23 @@ void HelloTriangleApplication::initVulkan()
 	createDeviceModule();
 	createSwapChain();
 	createImageViews();
-	createRenderPass();
-	createDescriptorSetLayout();
-
-	createGraphicsPipeline();
-	createDepthResources();
-	createFramebuffers();
+	
 	loadMeshAndObjects();
 	createLight();
+	createCamera();
+	createDepthResources();
+
+	createRenderPass();
+	createFramebuffers();
+	
 	createUniformBuffers();
 	createDescriptorPool();
+	createDescriptorSetLayout();
 	createDescriptorSet();
+	createGraphicsPipeline();
+
 	createCommandBuffers();
 	createSyncObjects();
-
-	createCamera();
 }
 
 void HelloTriangleApplication::createDescriptorPool()
@@ -185,7 +187,7 @@ void HelloTriangleApplication::createDescriptorSet()
 	VkDescriptorBufferInfo GBufferInfo{};
 	GBufferInfo.buffer = matUBO.buffer;
 	GBufferInfo.offset = 0;
-	GBufferInfo.range = sizeof(UniformBufferObject);
+	GBufferInfo.range = sizeof(UniformBufferMat);
 
 	std::vector<VkWriteDescriptorSet> GBufWriteDescriptorSets;
 	GBufWriteDescriptorSets = {
@@ -232,32 +234,32 @@ void HelloTriangleApplication::createImage(uint32_t width, uint32_t height, VkFo
 	vkBindImageMemory(vulkanDevice->logicalDevice, image, imageMemory, 0);
 }
 
-void HelloTriangleApplication::createTextureImage()
-{
-	int texWidth, texHeight, texChannels;
-	stbi_uc* pixels = stbi_load("../textures/02.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-	VkDeviceSize imageSize = texWidth * texHeight * 4;//The pixels are laid out row by row with 4 bytes per pixel
-	if(pixels == nullptr)
-	{
-		throw std::runtime_error("failed to load texture image!");
-	}
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-	vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-		imageSize, &stagingBuffer, &stagingBufferMemory, pixels);
-
-	stbi_image_free(pixels);
-
-	createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
-
-	transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-	transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-	vkDestroyBuffer(vulkanDevice->logicalDevice, stagingBuffer, nullptr);
-	vkFreeMemory(vulkanDevice->logicalDevice, stagingBufferMemory, nullptr);
-}
+//void HelloTriangleApplication::createTextureImage()
+//{
+//	int texWidth, texHeight, texChannels;
+//	stbi_uc* pixels = stbi_load("../textures/02.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+//	VkDeviceSize imageSize = texWidth * texHeight * 4;//The pixels are laid out row by row with 4 bytes per pixel
+//	if(pixels == nullptr)
+//	{
+//		throw std::runtime_error("failed to load texture image!");
+//	}
+//	VkBuffer stagingBuffer;
+//	VkDeviceMemory stagingBufferMemory;
+//	vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+//		imageSize, &stagingBuffer, &stagingBufferMemory, pixels);
+//
+//	stbi_image_free(pixels);
+//
+//	createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+//		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
+//
+//	transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+//	copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+//	transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+//
+//	vkDestroyBuffer(vulkanDevice->logicalDevice, stagingBuffer, nullptr);
+//	vkFreeMemory(vulkanDevice->logicalDevice, stagingBufferMemory, nullptr);
+//}
 
 VkCommandBuffer HelloTriangleApplication::beginSingleTimeCommands()
 {
@@ -448,7 +450,7 @@ bool HelloTriangleApplication::hasStencilComponent(VkFormat format)
 
 void HelloTriangleApplication::createUniformBuffers()
 {
-	VkDeviceSize MatbufferSize = sizeof(UniformBufferObject);
+	VkDeviceSize MatbufferSize = sizeof(UniformBufferMat);
 	vulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &matUBO, MatbufferSize);
 
 	VkDeviceSize LightbufferSize = sizeof(lightsData);
@@ -589,8 +591,8 @@ void HelloTriangleApplication::recreateSwapChain()
 
 	cleanupSwapChain();
 
-	vkDestroyImage(vulkanDevice->logicalDevice, textureImage, nullptr);
-	vkFreeMemory(vulkanDevice->logicalDevice, textureImageMemory, nullptr);
+	//vkDestroyImage(vulkanDevice->logicalDevice, textureImage, nullptr);
+	//vkFreeMemory(vulkanDevice->logicalDevice, textureImageMemory, nullptr);
 	createSwapChain();
 	createImageViews();
 	createRenderPass();
@@ -757,7 +759,7 @@ void HelloTriangleApplication::BuildGCommandBuffers()
 
 	VkClearValue clearValues[2];
 	clearValues[0].color = { {0.f, 0.f, 0.2f, 0.f} };
-	clearValues[1].depthStencil = { 1.f, 0.f };
+	clearValues[1].depthStencil = { 1.f, 0 };
 	//TODO: Start from here. 
 }
 
@@ -1170,7 +1172,7 @@ void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage)
 	auto currentTime = std::chrono::high_resolution_clock::now();
 	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-	UniformBufferObject ubo{};
+	UniformBufferMat ubo{};
 	ubo.view = camera->getViewMatrix();
 	ubo.proj = glm::perspective(glm::radians(45.f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.f);
 	ubo.proj[1][1] *= -1;
@@ -1195,11 +1197,11 @@ void HelloTriangleApplication::cleanup()
 
 	cleanupSwapChain();
 
-	vkDestroySampler(vulkanDevice->logicalDevice, textureSampler, nullptr);
+	/*vkDestroySampler(vulkanDevice->logicalDevice, textureSampler, nullptr);
 	vkDestroyImageView(vulkanDevice->logicalDevice, textureImageView, nullptr);
 
 	vkDestroyImage(vulkanDevice->logicalDevice, textureImage, nullptr);
-	vkFreeMemory(vulkanDevice->logicalDevice, textureImageMemory, nullptr);
+	vkFreeMemory(vulkanDevice->logicalDevice, textureImageMemory, nullptr);*/
 
 	matUBO.destroy();
 	lightUBO.destroy();
@@ -1226,50 +1228,50 @@ void HelloTriangleApplication::cleanup()
 	glfwTerminate();
 }
 
-void HelloTriangleApplication::createTextureImageView()
-{
-	textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+//void HelloTriangleApplication::createTextureImageView()
+//{
+//	textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+//
+//	for(uint32_t i = 0; i < swapChainImages.size(); ++i)
+//	{
+//		swapChainImageViews[i] = createImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+//	}
+//}
 
-	for(uint32_t i = 0; i < swapChainImages.size(); ++i)
-	{
-		swapChainImageViews[i] = createImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
-	}
-}
-
-void HelloTriangleApplication::createTextureSampler()
-{
-	VkSamplerCreateInfo samplerInfo{};
-	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-
-	samplerInfo.magFilter = VK_FILTER_LINEAR;
-	samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-
-	samplerInfo.anisotropyEnable = VK_TRUE;
-
-	VkPhysicalDeviceProperties properties{};
-	vkGetPhysicalDeviceProperties(vulkanDevice->physicalDevice, &properties);
-
-	samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-
-	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	samplerInfo.unnormalizedCoordinates = VK_FALSE;
-	samplerInfo.compareEnable = VK_FALSE;
-	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerInfo.mipLodBias = 0.f;
-	samplerInfo.minLod = 0.f;
-	samplerInfo.maxLod = 0.f;
-
-	if(vkCreateSampler(vulkanDevice->logicalDevice, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to create texture sampler!");
-	}
-}
+//void HelloTriangleApplication::createTextureSampler()
+//{
+//	VkSamplerCreateInfo samplerInfo{};
+//	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+//
+//	samplerInfo.magFilter = VK_FILTER_LINEAR;
+//	samplerInfo.minFilter = VK_FILTER_LINEAR;
+//
+//	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+//	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+//	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+//
+//	samplerInfo.anisotropyEnable = VK_TRUE;
+//
+//	VkPhysicalDeviceProperties properties{};
+//	vkGetPhysicalDeviceProperties(vulkanDevice->physicalDevice, &properties);
+//
+//	samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+//
+//	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+//	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+//	samplerInfo.compareEnable = VK_FALSE;
+//	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+//
+//	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+//	samplerInfo.mipLodBias = 0.f;
+//	samplerInfo.minLod = 0.f;
+//	samplerInfo.maxLod = 0.f;
+//
+//	if(vkCreateSampler(vulkanDevice->logicalDevice, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS)
+//	{
+//		throw std::runtime_error("failed to create texture sampler!");
+//	}
+//}
 
 
 VkImageView HelloTriangleApplication::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)

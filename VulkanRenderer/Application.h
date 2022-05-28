@@ -40,7 +40,7 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif //  NDEBUG
 
-struct UniformBufferObject
+struct UniformBufferMat
 {
 	glm::mat4 view;
 	glm::mat4 proj;
@@ -106,7 +106,7 @@ private:
 
 	void initVulkan();
 
-	void createTextureImage();
+	//void createTextureImage();
 
 	void createDepthResources();
 
@@ -164,9 +164,9 @@ private:
 
 	void cleanup();
 
-	void createTextureImageView();
+	//void createTextureImageView();
 
-	void createTextureSampler();
+	//void createTextureSampler();
 
 	VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 
@@ -252,6 +252,23 @@ public:
 
 	FrameBuffer GBuffer;
 	FrameBuffer LightBuffer;
+
+	VkRenderPass GRenderPass;
+	VkRenderPass LightRenderPass;
+
+	VkPipeline GBufferPipeline;
+	VkPipeline LightingPipeline;
+
+	VkPipelineLayout pipelineLayout;
+
+	VkDescriptorPool descriptorPool;
+
+	VkDescriptorSetLayout GBufferDescriptorSetLayout;
+	VkDescriptorSetLayout LightingDescriptorSetLayout;
+
+	VkDescriptorSet GBufferDescriptorSet;
+	VkDescriptorSet LightingDescriptorSet;
+
 	VkSampler colorSampler;
 
 	std::chrono::system_clock::time_point frameStart;
@@ -270,18 +287,6 @@ private:
 
 	VkSurfaceKHR surface;
 	VkSwapchainKHR swapChain;
-	VkRenderPass renderPass;
-
-	VkPipelineLayout pipelineLayout;
-
-	VkPipeline GBufferPipeline;
-	VkPipeline LightingPipeline;
-
-	VkDescriptorPool descriptorPool;
-	VkDescriptorSetLayout descriptorSetLayout;
-
-	VkDescriptorSet GBufferDescriptorSet;
-	VkDescriptorSet LightingDescriptorSet;
 
 	VkCommandBuffer commandBuffer;
 
@@ -296,12 +301,6 @@ private:
 	std::vector<VkFramebuffer> swapChainFramebuffers;
 	std::vector <VkImage> swapChainImages;
 	std::vector <VkImageView> swapChainImageViews;
-	
-	//Texture
-	VkImage textureImage;
-	VkDeviceMemory textureImageMemory;
-	VkImageView textureImageView;
-	VkSampler textureSampler;
 
 	//Depth
 	VkImage depthImage;
