@@ -120,15 +120,15 @@ void HelloTriangleApplication::createDescriptorPool()
 {
 	VkDescriptorPoolSize matPoolsize{};
 	matPoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	matPoolsize.descriptorCount = 9;//TODO: 이 count가 어떻게 되는지, desciptor, descriptor set, descriptor layout, descriptor pool에 대해 이해해야함.
+	matPoolsize.descriptorCount = 2;
 
 	VkDescriptorPoolSize Lightpoolsize{};
 	Lightpoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	Lightpoolsize.descriptorCount = 9;//TODO: 왜 1인지, 어떻게 돌아가는지 알아야함.
+	Lightpoolsize.descriptorCount = 2;
 
 	VkDescriptorPoolSize GBufferAttachmentSize{};
 	GBufferAttachmentSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	GBufferAttachmentSize.descriptorCount = 9;
+	GBufferAttachmentSize.descriptorCount = 3;//TODO: Why 6? not 3?
 
 	std::vector<VkDescriptorPoolSize> poolSizes = { matPoolsize, Lightpoolsize, GBufferAttachmentSize };
 
@@ -147,11 +147,11 @@ void HelloTriangleApplication::createDescriptorPool()
 
 void HelloTriangleApplication::createDescriptorSet()
 {
-	VkDescriptorSetAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = descriptorPool;
-	allocInfo.descriptorSetCount = 1;
-	allocInfo.pSetLayouts = &descriptorSetLayout;
+	VkDescriptorSetAllocateInfo lightingAllocInfo{};
+	lightingAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	lightingAllocInfo.descriptorPool = descriptorPool;
+	lightingAllocInfo.descriptorSetCount = 1;
+	lightingAllocInfo.pSetLayouts = &descriptorSetLayout;
 
 	VkDescriptorImageInfo texPosDisc;
 	texPosDisc.sampler = colorSampler;
@@ -169,11 +169,11 @@ void HelloTriangleApplication::createDescriptorSet()
 	texColorDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	// Deferred composition
-	if (vkAllocateDescriptorSets(vulkanDevice->logicalDevice, &allocInfo, &LightingDescriptorSet) != VK_SUCCESS)
+	if (vkAllocateDescriptorSets(vulkanDevice->logicalDevice, &lightingAllocInfo, &LightingDescriptorSet) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to allocate descriptor sets");
 	}
-
+	
 	VkDescriptorBufferInfo LightbufferInfo{};
 	LightbufferInfo.buffer = lightUBO.buffer;
 	LightbufferInfo.offset = 0;
@@ -192,15 +192,23 @@ void HelloTriangleApplication::createDescriptorSet()
 
 	// G-Buffer description
 
-	if (vkAllocateDescriptorSets(vulkanDevice->logicalDevice, &allocInfo, &GBufferDescriptorSet) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to allocate descriptor sets");
-	}
+
+	VkDescriptorSetAllocateInfo GAllocInfo{};
+	GAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	GAllocInfo.descriptorPool = descriptorPool;
+	GAllocInfo.descriptorSetCount = 1;
+	GAllocInfo.pSetLayouts = &descriptorSetLayout;
+
 
 	VkDescriptorBufferInfo GBufferInfo{};
 	GBufferInfo.buffer = matUBO.buffer;
 	GBufferInfo.offset = 0;
 	GBufferInfo.range = sizeof(UniformBufferMat);
+
+	if (vkAllocateDescriptorSets(vulkanDevice->logicalDevice, &GAllocInfo, &GBufferDescriptorSet) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to allocate descriptor sets");
+	}
 
 	std::vector<VkWriteDescriptorSet> GBufWriteDescriptorSets;
 	GBufWriteDescriptorSets = {
@@ -675,56 +683,6 @@ void HelloTriangleApplication::mouseCallback(GLFWwindow* window, double xposIn, 
 
 	app->camera->ProcessMouseMovement(xoffset, yoffset);
 }
-
-//void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
-//{
-//	VkCommandBufferBeginInfo beginInfo{};
-//	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-//	beginInfo.flags = 0;
-//	beginInfo.pInheritanceInfo = nullptr;
-//
-//	if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
-//	{
-//		throw std::runtime_error("failed to begin recording command buffer");
-//	}
-//
-//	VkRenderPassBeginInfo renderPassInfo{};
-//	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-//	renderPassInfo.renderPass = renderPass;
-//	renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
-//
-//	renderPassInfo.renderArea.offset = { 0, 0 };
-//	renderPassInfo.renderArea.extent = swapChainExtent;
-//
-//	std::array<VkClearValue, 2> clearValues{};
-//	clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-//	clearValues[1].depthStencil = { 1.0f, 0 };
-//
-//	renderPassInfo.clearValueCount = clearValues.size();
-//	renderPassInfo.pClearValues = clearValues.data();
-//
-//	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-//
-//	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-//	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-//	//
-//	for(Object* object : objects)
-//	{
-//		VkBuffer vertexBuffers[] = { object->mMesh->vertexBuffer };
-//		VkDeviceSize offsets[] = { 0 };
-//		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-//		glm::mat4 modelMat = object->BuildModelMat();
-//		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMat);
-//		vkCmdDraw(commandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
-//	}
-//	//
-//
-//	vkCmdEndRenderPass(commandBuffer);
-//	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
-//	{
-//		throw std::runtime_error("failed to record command buffer!");
-//	}
-//}
 
 void HelloTriangleApplication::BuildGCommandBuffers()
 {

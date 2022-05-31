@@ -1,8 +1,8 @@
 #version 450
 
 layout (binding = 2) uniform sampler2D samplerposition;
-layout (binding = 3) uniform sampler2D samplerAlbedo;
-layout (binding = 4) uniform sampler2D samplerNormal;
+layout (binding = 3) uniform sampler2D samplerNormal;
+layout (binding = 4) uniform sampler2D samplerAlbedo;
 
 layout (location = 0) in vec2 inUV;
 
@@ -34,7 +34,7 @@ void main()
     for(int i = 0; i < 3; ++i)
     {
         vec3 norm_l = normalize(dirLight.dirlights[i].dir);
-        float diff = max(dot(norm_l, norm_n), 0.3);
+        float diff = max(dot(norm_l, norm_n), 0.2);
         vec3 diffuse = diff * dirLight.dirlights[i].color;
 
         result += (diffuse) * vec3(albedo);

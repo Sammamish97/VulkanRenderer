@@ -26,7 +26,7 @@
 #include "Mesh.h"
 #include "Camera.h"
 #include "Object.h"
-#include "DirLight.h"
+#include "UniformStructure.h"
 
 const uint32_t WIDTH = 1080;
 const uint32_t HEIGHT = 720;
@@ -39,19 +39,6 @@ const bool enableValidationLayers = false;
 #else
 const bool enableValidationLayers = true;
 #endif //  NDEBUG
-
-struct UniformBufferMat
-{
-	glm::mat4 view;
-	glm::mat4 proj;
-};
-
-struct UniformBufferLights
-{
-	DirLight dir_light[3];
-	glm::vec3 lookVec;
-};
-
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
@@ -111,7 +98,10 @@ public:
 	void run();
 
 private:
+	void initWindow();
 	void initVulkan();
+	void mainLoop();
+	void cleanup();
 
 private:
 	void createGRenderPass();
@@ -137,42 +127,23 @@ private:
 	void createSyncObjects();
 
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags feature);
-
 	VkFormat findDepthFormat();
-
 	bool hasStencilComponent(VkFormat format);
-
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-
 	void cleanupSwapChain();
-
 	VkCommandBuffer beginSingleTimeCommands();
-
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-
 	void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
-
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-
 	VkShaderModule createShaderModule(const std::vector<char>& code);
 
-	
-	void initWindow();
-	
 	void setupDebugMessenger();
 	static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
 	static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
 	void createSurface();
 	void createDeviceModule();
-	
-	
 	void createDepthResources(VkImage depthImage, VkDeviceMemory memory);
-	
-	void mainLoop();
-	
-	void cleanup();
 
 	VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 
@@ -227,6 +198,7 @@ private:
 
 public:
 	VulkanDevice* vulkanDevice;
+
 	Mesh* redMesh;
 	Mesh* greenMesh;
 	Mesh* BlueMesh;

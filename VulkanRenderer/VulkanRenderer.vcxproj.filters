@@ -80,6 +80,9 @@
     <ClInclude Include="VulkanInitializers.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="UniformStructure.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\shaders\GBuffer.frag">
