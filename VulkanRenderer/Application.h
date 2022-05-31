@@ -164,9 +164,7 @@ private:
 
 	/**/
 	void loadMeshAndObjects();
-
 	void createCamera();
-
 	void createLight();
 
 	void processInput();
@@ -203,6 +201,7 @@ public:
 	Mesh* greenMesh;
 	Mesh* BlueMesh;
 	std::vector<Object*> objects;
+
 	Camera* camera;
 	MouseInfo mouseInfo;
 	UniformBufferLights lightsData;
@@ -215,11 +214,13 @@ public:
 	VkPipeline GBufferPipeline;
 	VkPipeline LightingPipeline;
 
-	VkPipelineLayout pipelineLayout;
+	VkPipelineLayout GPipelineLayout;
+	VkPipelineLayout LightPipelineLayout;
 
 	VkDescriptorPool descriptorPool;
 
-	VkDescriptorSetLayout descriptorSetLayout;
+	VkDescriptorSetLayout GDescriptorSetLayout;
+	VkDescriptorSetLayout LightDescriptorSetLayout;
 
 	VkDescriptorSet GBufferDescriptorSet;
 	VkDescriptorSet LightingDescriptorSet;

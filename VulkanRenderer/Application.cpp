@@ -92,8 +92,6 @@ void HelloTriangleApplication::initVulkan()
 	createLight();
 	createCamera();
 
-	//reateDepthResources();
-
 	createSwapChain();
 	createSwapChainImageViews();
 	createSwapChainRenderPass();
@@ -109,7 +107,7 @@ void HelloTriangleApplication::initVulkan()
 	createDescriptorSetLayout();
 	createDescriptorSet();
 
-	createGraphicsPipelines();//<-
+	createGraphicsPipelines();
 
 	createCommandBuffers();
 	
@@ -128,7 +126,7 @@ void HelloTriangleApplication::createDescriptorPool()
 
 	VkDescriptorPoolSize GBufferAttachmentSize{};
 	GBufferAttachmentSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	GBufferAttachmentSize.descriptorCount = 3;//TODO: Why 6? not 3?
+	GBufferAttachmentSize.descriptorCount = 3;
 
 	std::vector<VkDescriptorPoolSize> poolSizes = { matPoolsize, Lightpoolsize, GBufferAttachmentSize };
 
@@ -151,7 +149,7 @@ void HelloTriangleApplication::createDescriptorSet()
 	lightingAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	lightingAllocInfo.descriptorPool = descriptorPool;
 	lightingAllocInfo.descriptorSetCount = 1;
-	lightingAllocInfo.pSetLayouts = &descriptorSetLayout;
+	lightingAllocInfo.pSetLayouts = &LightDescriptorSetLayout;
 
 	VkDescriptorImageInfo texPosDisc;
 	texPosDisc.sampler = colorSampler;
@@ -197,7 +195,7 @@ void HelloTriangleApplication::createDescriptorSet()
 	GAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	GAllocInfo.descriptorPool = descriptorPool;
 	GAllocInfo.descriptorSetCount = 1;
-	GAllocInfo.pSetLayouts = &descriptorSetLayout;
+	GAllocInfo.pSetLayouts = &GDescriptorSetLayout;
 
 
 	VkDescriptorBufferInfo GBufferInfo{};
@@ -517,22 +515,30 @@ void HelloTriangleApplication::createDescriptorSetLayout()
 	albedoTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	albedoTextureBinding.pImmutableSamplers = nullptr;
 
-	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = { matLayoutBinding , lightLayoutBinding, positionTextureBinding, normalTextureBinding, albedoTextureBinding };
+	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = { lightLayoutBinding, positionTextureBinding, normalTextureBinding, albedoTextureBinding };
 
-	VkDescriptorSetLayoutCreateInfo descriptorLayout = initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(vulkanDevice->logicalDevice, &descriptorLayout, nullptr, &descriptorSetLayout))
+	VkDescriptorSetLayoutCreateInfo lightDescriptorLayout = initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(vulkanDevice->logicalDevice, &lightDescriptorLayout, nullptr, &LightDescriptorSetLayout))
 
-	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&descriptorSetLayout, 1);
+	VkPipelineLayoutCreateInfo LightpipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&LightDescriptorSetLayout, 1);
+	VK_CHECK_RESULT(vkCreatePipelineLayout(vulkanDevice->logicalDevice, &LightpipelineLayoutCreateInfo, nullptr, &LightPipelineLayout))
+
+	//Create Lighting descriptor set layout and pipeilne
+	std::vector<VkDescriptorSetLayoutBinding> GLayoutBinding = { matLayoutBinding };
+
+	VkDescriptorSetLayoutCreateInfo GDescriptorLayout = initializers::descriptorSetLayoutCreateInfo(GLayoutBinding);
+
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(vulkanDevice->logicalDevice, &GDescriptorLayout, nullptr, &GDescriptorSetLayout))
 	VkPushConstantRange pushConstant;
 	pushConstant.offset = 0;
 	pushConstant.size = sizeof(glm::mat4);
 	pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+	VkPipelineLayoutCreateInfo GpipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&GDescriptorSetLayout, 1);
+	GpipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+	GpipelineLayoutCreateInfo.pPushConstantRanges = &pushConstant;
 
-	pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-	pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstant;
-
-	VK_CHECK_RESULT(vkCreatePipelineLayout(vulkanDevice->logicalDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout))
+	VK_CHECK_RESULT(vkCreatePipelineLayout(vulkanDevice->logicalDevice, &GpipelineLayoutCreateInfo, nullptr, &GPipelineLayout))
 }
 
 uint32_t HelloTriangleApplication::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
@@ -863,7 +869,7 @@ void HelloTriangleApplication::createGraphicsPipelines()
 		initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(pipelineLayout, mGlobalSwapChainRenderPass);
+	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(LightPipelineLayout, mGlobalSwapChainRenderPass);
 	pipelineCI.pInputAssemblyState = &inputAssemblyState;
 	pipelineCI.pRasterizationState = &rasterizationState;
 	pipelineCI.pColorBlendState = &colorBlendState;
@@ -895,6 +901,7 @@ void HelloTriangleApplication::createGraphicsPipelines()
 	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
 	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
+	pipelineCI.layout = GPipelineLayout;
 	pipelineCI.pVertexInputState = &vertexInputInfo;
 	rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
 
@@ -952,7 +959,7 @@ void HelloTriangleApplication::buildGCommandBuffer()
 
 	vkCmdBindPipeline(GCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GBufferPipeline);
 
-	vkCmdBindDescriptorSets(GCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &GBufferDescriptorSet, 0, nullptr);
+	vkCmdBindDescriptorSets(GCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GPipelineLayout, 0, 1, &GBufferDescriptorSet, 0, nullptr);
 
 	for (Object* object : objects)
 	{
@@ -960,7 +967,7 @@ void HelloTriangleApplication::buildGCommandBuffer()
 		VkDeviceSize offsets[] = { 0 };
 		vkCmdBindVertexBuffers(GCommandBuffer, 0, 1, vertexBuffers, offsets);
 		glm::mat4 modelMat = object->BuildModelMat();
-		vkCmdPushConstants(GCommandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMat);
+		vkCmdPushConstants(GCommandBuffer, GPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMat);
 		vkCmdDraw(GCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
 	}
 
@@ -995,7 +1002,7 @@ void HelloTriangleApplication::buildLightCommandBuffer(int swapChianIndex)
 	VkRect2D scissor = initializers::rect2D(WIDTH, HEIGHT, 0, 0);
 	vkCmdSetScissor(LightingCommandBuffer, 0, 1, &scissor);
 
-	vkCmdBindDescriptorSets(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &LightingDescriptorSet, 0, nullptr);
+	vkCmdBindDescriptorSets(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LightPipelineLayout, 0, 1, &LightingDescriptorSet, 0, nullptr);
 
 	vkCmdBindPipeline(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LightingPipeline);
 
