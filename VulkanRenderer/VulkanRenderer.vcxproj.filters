@@ -82,10 +82,16 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\shaders\shader.frag">
+    <None Include="..\shaders\GBuffer.frag">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\shaders\shader.vert">
+    <None Include="..\shaders\GBuffer.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\shaders\Lighting.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\shaders\Lighting.vert">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

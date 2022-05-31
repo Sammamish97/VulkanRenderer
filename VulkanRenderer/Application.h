@@ -44,12 +44,12 @@ struct UniformBufferMat
 {
 	glm::mat4 view;
 	glm::mat4 proj;
-	glm::vec3 lookVec;
 };
 
 struct UniformBufferLights
 {
 	DirLight dir_light[3];
+	glm::vec3 lookVec;
 };
 
 
@@ -83,12 +83,25 @@ struct FrameBufferAttachment
 	VkFormat format;
 };
 
-struct FrameBuffer
+struct GFrameBuffer
 {
 	int32_t width, height;
 	VkFramebuffer framebuffer;
 	FrameBufferAttachment position, normal, albedo;
 	FrameBufferAttachment depth;
+	VkRenderPass renderPass;
+};
+
+struct SwapChainFrameBuffer
+{
+	SwapChainFrameBuffer() = default;
+	SwapChainFrameBuffer(int32_t width, int32_t height)
+		: mWidth(width), mHeight(height){}
+
+	int32_t mWidth, mHeight;
+	VkFramebuffer framebuffer;
+	FrameBufferAttachment colorAttachment;
+	FrameBufferAttachment depthAttachment;
 	VkRenderPass renderPass;
 };
 
@@ -98,17 +111,30 @@ public:
 	void run();
 
 private:
-	void initWindow();
-
-	static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
-
-	static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
-
 	void initVulkan();
 
-	//void createTextureImage();
+private:
+	void createGRenderPass();
+	void createGFramebuffer();
+	void createSampler();
+	void createUniformBuffers();
+	void createDescriptorPool();
+	void createDescriptorSetLayout();
+	void createDescriptorSet();
+	void createGraphicsPipelines();
+	void createCommandBuffers();
+	void buildLightCommandBuffer(int swapChianIndex);
+	void buildGCommandBuffer();
+	void drawFrame();
+	void updateUniformBuffer(uint32_t currentImage);
 
-	void createDepthResources();
+	void createSwapChain();
+	void createSwapChainImageViews();
+	void createSwapChainRenderPass();
+	void createSwapChainFrameBuffer();
+
+	//void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+	void createSyncObjects();
 
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags feature);
 
@@ -116,27 +142,9 @@ private:
 
 	bool hasStencilComponent(VkFormat format);
 
-	void createDescriptorPool();
-
-	void createDescriptorSet();
-
-	void createUniformBuffers();
-
-	void createDescriptorSetLayout();
-
-	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
-
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 	void cleanupSwapChain();
-
-	void recreateSwapChain();
-
-	void createSyncObjects();
-
-	void createCommandBuffers();
-
-	void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
 	VkCommandBuffer beginSingleTimeCommands();
 
@@ -148,61 +156,39 @@ private:
 
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
-	void createFramebuffers();
-
-	void createRenderPass();
-
 	VkShaderModule createShaderModule(const std::vector<char>& code);
 
-	void createGraphicsPipeline();
-
+	
+	void initWindow();
+	
+	void setupDebugMessenger();
+	static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
+	static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
+	void createSurface();
+	void createDeviceModule();
+	
+	
+	void createDepthResources(VkImage depthImage, VkDeviceMemory memory);
+	
 	void mainLoop();
-
-	void drawFrame();
-
-	void updateUniformBuffer(uint32_t currentImage);
-
+	
 	void cleanup();
 
-	//void createTextureImageView();
-
-	//void createTextureSampler();
-
 	VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
-
-	void createImageViews();
 
 	void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
 		VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
 
-	void createSwapChain();
-
-	void createSurface();
-
 	bool isDeviceSuitable(VkPhysicalDevice device);
-
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-	
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
-
 	VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
-
 	VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
-
 	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-
-	void createDeviceModule();
-
 	VkPhysicalDevice pickPhysicalDevice();
-
 	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
-
-	void setupDebugMessenger();
-
 	void createInstance();
-
 	void checkExtensions();
-
 	bool checkValidationLayerSupport();
 
 	/**/
@@ -217,6 +203,8 @@ private:
 	void createAttachment(VkFormat format, VkImageUsageFlagBits usage, FrameBufferAttachment* attachment);
 
 	void PrepareGBuffer();
+
+	VkPipelineShaderStageCreateInfo createShaderStageCreateInfo(const std::string& path, VkShaderStageFlagBits stage);
 
 	void FrameStart();
 
@@ -250,11 +238,7 @@ public:
 	Buffer matUBO;
 	Buffer lightUBO;
 
-	FrameBuffer GBuffer;
-	FrameBuffer LightBuffer;
-
-	VkRenderPass GRenderPass;
-	VkRenderPass LightRenderPass;
+	GFrameBuffer mGFrameBuffer;
 
 	VkPipeline GBufferPipeline;
 	VkPipeline LightingPipeline;
@@ -263,8 +247,7 @@ public:
 
 	VkDescriptorPool descriptorPool;
 
-	VkDescriptorSetLayout GBufferDescriptorSetLayout;
-	VkDescriptorSetLayout LightingDescriptorSetLayout;
+	VkDescriptorSetLayout descriptorSetLayout;
 
 	VkDescriptorSet GBufferDescriptorSet;
 	VkDescriptorSet LightingDescriptorSet;
@@ -286,29 +269,21 @@ private:
 	VkDebugUtilsMessengerEXT debugMessenger;
 
 	VkSurfaceKHR surface;
-	VkSwapchainKHR swapChain;
 
-	VkCommandBuffer commandBuffer;
+	VkCommandBuffer GCommandBuffer;
+	VkCommandBuffer LightingCommandBuffer;
 
 	//Synchronize
-	VkSemaphore imageAvailableSemaphore;
-	VkSemaphore renderFinishedSemaphore;
+	VkSemaphore GBufferComplete;
+	VkSemaphore renderComplete;
+	VkSemaphore presentComplete;
 	VkFence inFlightFence;
-
-	VkSemaphore offscreenSemaphore;
-
+	
 	//Swap chain
-	std::vector<VkFramebuffer> swapChainFramebuffers;
-	std::vector <VkImage> swapChainImages;
-	std::vector <VkImageView> swapChainImageViews;
-
-	//Depth
-	VkImage depthImage;
-	VkDeviceMemory depthImageMemory;
-	VkImageView depthImageView;
-
-	//Swap chain
-	VkFormat swapChainImageFormat;
+	VkSwapchainKHR swapChain;
+	std::vector<SwapChainFrameBuffer> mSwapChainFrameBufers;
+	VkRenderPass mGlobalSwapChainRenderPass;
 	VkExtent2D swapChainExtent;
+
 	GLFWwindow* window = nullptr;
 };

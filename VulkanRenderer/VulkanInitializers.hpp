@@ -43,4 +43,205 @@ namespace initializers
 		cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		return cmdBufferBeginInfo;
 	}
+
+	inline VkRenderPassBeginInfo renderPassBeginInfo()
+	{
+		VkRenderPassBeginInfo renderPassBeginInfo{};
+		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		return renderPassBeginInfo;
+	}
+
+	inline VkSamplerCreateInfo samplerCreateInfo()
+	{
+		VkSamplerCreateInfo samplerCreateInfo{};
+		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerCreateInfo.maxAnisotropy = 1.0f;
+		return samplerCreateInfo;
+	}
+
+	inline VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo(
+		const std::vector<VkDescriptorSetLayoutBinding>& bindings)
+	{
+		VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
+		descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		descriptorSetLayoutCreateInfo.pBindings = bindings.data();
+		descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+		return descriptorSetLayoutCreateInfo;
+	}
+
+	inline VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo(
+		const VkDescriptorSetLayout* pSetLayouts,
+		uint32_t setLayoutCount = 1)
+	{
+		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+		pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipelineLayoutCreateInfo.setLayoutCount = setLayoutCount;
+		pipelineLayoutCreateInfo.pSetLayouts = pSetLayouts;
+		return pipelineLayoutCreateInfo;
+	}
+
+	inline VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo(
+		VkPrimitiveTopology topology,
+		VkPipelineInputAssemblyStateCreateFlags flags,
+		VkBool32 primitiveRestartEnable)
+	{
+		VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo{};
+		pipelineInputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		pipelineInputAssemblyStateCreateInfo.topology = topology;
+		pipelineInputAssemblyStateCreateInfo.flags = flags;
+		pipelineInputAssemblyStateCreateInfo.primitiveRestartEnable = primitiveRestartEnable;
+		return pipelineInputAssemblyStateCreateInfo;
+	}
+
+	inline VkPipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo(
+		VkPolygonMode polygonMode,
+		VkCullModeFlags cullMode,
+		VkFrontFace frontFace,
+		VkPipelineRasterizationStateCreateFlags flags = 0)
+	{
+		VkPipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo{};
+		pipelineRasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		pipelineRasterizationStateCreateInfo.polygonMode = polygonMode;
+		pipelineRasterizationStateCreateInfo.cullMode = cullMode;
+		pipelineRasterizationStateCreateInfo.frontFace = frontFace;
+		pipelineRasterizationStateCreateInfo.flags = flags;
+		pipelineRasterizationStateCreateInfo.depthClampEnable = VK_FALSE;
+		pipelineRasterizationStateCreateInfo.lineWidth = 1.0f;
+		return pipelineRasterizationStateCreateInfo;
+	}
+
+	inline VkPipelineColorBlendAttachmentState pipelineColorBlendAttachmentState(
+		VkColorComponentFlags colorWriteMask,
+		VkBool32 blendEnable)
+	{
+		VkPipelineColorBlendAttachmentState pipelineColorBlendAttachmentState{};
+		pipelineColorBlendAttachmentState.colorWriteMask = colorWriteMask;
+		pipelineColorBlendAttachmentState.blendEnable = blendEnable;
+		return pipelineColorBlendAttachmentState;
+	}
+
+	inline VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo(
+		uint32_t attachmentCount,
+		const VkPipelineColorBlendAttachmentState* pAttachments)
+	{
+		VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo{};
+		pipelineColorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		pipelineColorBlendStateCreateInfo.attachmentCount = attachmentCount;
+		pipelineColorBlendStateCreateInfo.pAttachments = pAttachments;
+		return pipelineColorBlendStateCreateInfo;
+	}
+
+	inline VkPipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo(
+		VkBool32 depthTestEnable,
+		VkBool32 depthWriteEnable,
+		VkCompareOp depthCompareOp)
+	{
+		VkPipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo{};
+		pipelineDepthStencilStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		pipelineDepthStencilStateCreateInfo.depthTestEnable = depthTestEnable;
+		pipelineDepthStencilStateCreateInfo.depthWriteEnable = depthWriteEnable;
+		pipelineDepthStencilStateCreateInfo.depthCompareOp = depthCompareOp;
+		pipelineDepthStencilStateCreateInfo.back.compareOp = VK_COMPARE_OP_ALWAYS;
+		return pipelineDepthStencilStateCreateInfo;
+	}
+
+	inline VkPipelineViewportStateCreateInfo pipelineViewportStateCreateInfo(
+		uint32_t viewportCount,
+		uint32_t scissorCount,
+		VkPipelineViewportStateCreateFlags flags = 0)
+	{
+		VkPipelineViewportStateCreateInfo pipelineViewportStateCreateInfo{};
+		pipelineViewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		pipelineViewportStateCreateInfo.viewportCount = viewportCount;
+		pipelineViewportStateCreateInfo.scissorCount = scissorCount;
+		pipelineViewportStateCreateInfo.flags = flags;
+		return pipelineViewportStateCreateInfo;
+	}
+
+	inline VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo(
+		VkSampleCountFlagBits rasterizationSamples,
+		VkPipelineMultisampleStateCreateFlags flags = 0)
+	{
+		VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo{};
+		pipelineMultisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		pipelineMultisampleStateCreateInfo.rasterizationSamples = rasterizationSamples;
+		pipelineMultisampleStateCreateInfo.flags = flags;
+		return pipelineMultisampleStateCreateInfo;
+	}
+
+	inline VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo(
+		const std::vector<VkDynamicState>& pDynamicStates,
+		VkPipelineDynamicStateCreateFlags flags = 0)
+	{
+		VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo{};
+		pipelineDynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		pipelineDynamicStateCreateInfo.pDynamicStates = pDynamicStates.data();
+		pipelineDynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(pDynamicStates.size());
+		pipelineDynamicStateCreateInfo.flags = flags;
+		return pipelineDynamicStateCreateInfo;
+	}
+
+	inline VkGraphicsPipelineCreateInfo pipelineCreateInfo(
+		VkPipelineLayout layout,
+		VkRenderPass renderPass,
+		VkPipelineCreateFlags flags = 0)
+	{
+		VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
+		pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipelineCreateInfo.layout = layout;
+		pipelineCreateInfo.renderPass = renderPass;
+		pipelineCreateInfo.flags = flags;
+		pipelineCreateInfo.basePipelineIndex = -1;
+		pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
+		return pipelineCreateInfo;
+	}
+
+	inline VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo()
+	{
+		VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo{};
+		pipelineVertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		return pipelineVertexInputStateCreateInfo;
+	}
+
+	inline VkViewport viewport(
+		float width,
+		float height,
+		float minDepth,
+		float maxDepth)
+	{
+		VkViewport viewport{};
+		viewport.width = width;
+		viewport.height = height;
+		viewport.minDepth = minDepth;
+		viewport.maxDepth = maxDepth;
+		return viewport;
+	}
+
+	inline VkRect2D rect2D(
+		int32_t width,
+		int32_t height,
+		int32_t offsetX,
+		int32_t offsetY)
+	{
+		VkRect2D rect2D{};
+		rect2D.extent.width = width;
+		rect2D.extent.height = height;
+		rect2D.offset.x = offsetX;
+		rect2D.offset.y = offsetY;
+		return rect2D;
+	}
+
+	inline VkSemaphoreCreateInfo semaphoreCreateInfo()
+	{
+		VkSemaphoreCreateInfo semaphoreCreateInfo{};
+		semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+		return semaphoreCreateInfo;
+	}
+
+	inline VkImageViewCreateInfo imageViewCreateInfo()
+	{
+		VkImageViewCreateInfo imageViewCreateInfo{};
+		imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		return imageViewCreateInfo;
+	}
 }
