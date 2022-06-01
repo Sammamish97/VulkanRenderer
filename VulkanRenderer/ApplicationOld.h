@@ -27,7 +27,6 @@
 #include "Camera.h"
 #include "Object.h"
 #include "UniformStructure.h"
-#include "FrameBuffer.h"
 
 const uint32_t WIDTH = 1080;
 const uint32_t HEIGHT = 720;
@@ -49,11 +48,26 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 
 static std::vector<char> readFile(const std::string& filename);
 
+struct SwapChainSupportDetails
+{
+	VkSurfaceCapabilitiesKHR capabilities;
+	std::vector<VkSurfaceFormatKHR> formats;
+	std::vector<VkPresentModeKHR> presentModes;
+};
+
 struct MouseInfo
 {
 	float lastX = 540;
 	float lastY = 360;
 	bool firstMouse = true;
+};
+
+struct FrameBufferAttachment
+{
+	VkImage image;
+	VkDeviceMemory memory;
+	VkImageView view;
+	VkFormat format;
 };
 
 struct GFrameBuffer
@@ -65,10 +79,21 @@ struct GFrameBuffer
 	VkRenderPass renderPass;
 };
 
+struct SwapChainFrameBuffer
+{
+	SwapChainFrameBuffer() = default;
+	SwapChainFrameBuffer(int32_t width, int32_t height)
+		: mWidth(width), mHeight(height){}
+
+	int32_t mWidth, mHeight;
+	VkFramebuffer framebuffer;
+	FrameBufferAttachment colorAttachment;
+	FrameBufferAttachment depthAttachment;
+	VkRenderPass renderPass;
+};
+
 class HelloTriangleApplication
 {
-	friend class SwapChain;
-
 public:
 	void run();
 
@@ -235,4 +260,6 @@ private:
 	VkSemaphore renderComplete;
 	VkSemaphore presentComplete;
 	VkFence inFlightFence;
+	
+	
 };

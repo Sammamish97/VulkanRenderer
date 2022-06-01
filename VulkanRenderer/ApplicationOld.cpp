@@ -4,8 +4,6 @@
 #include "VulkanInitializers.hpp"
 #include <stb_image.h>
 
-#include "SwapChain.h"
-
 #define TEX_DIM 2048
 #define TEX_FILTER VK_FILTER_LINEAR
 #define FB_DIM TEX_DIM
