@@ -28,7 +28,6 @@ class SwapChain
 {
 public:
 	VkSwapchainKHR mSwapChain;
-	VkSurfaceKHR mSurface;
 
 	VkRenderPass mGlobalSwapChainRenderPass;
 
@@ -45,18 +44,18 @@ private:
 
 public:
 	SwapChain(HelloTriangleApplication* vkApp);
+
+public:
 	void CreateSwapChain();
 	VkSwapchainKHR GetSwapChain();
 	SwapChainFrameBuffer GetFrameBuffer(uint32_t availableIndex);
 
 private:
-	void CreateSurface();
 	void CacheSwapChainImage();
 	void CreateSwapChainImageView();
 	void CreateSwapChainRenderPass();
 	void CreateSwapChainFrameBuffer();
 
-	SwapChainSupportDetails QuerySwapChainSupport();
 	VkSurfaceFormatKHR PickSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 	VkPresentModeKHR PickPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 	VkExtent2D PickExtent(const VkSurfaceCapabilitiesKHR& capabilities);

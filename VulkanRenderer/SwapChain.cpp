@@ -1,17 +1,22 @@
 #include "SwapChain.h"
 #include "Application.h"
 #include "VulkanTools.h"
+#include "VulkanInitializers.hpp"
 #include <GLFW/glfw3.h>
 
 SwapChain::SwapChain(HelloTriangleApplication* vkApp)
 	:mApp(vkApp)
 {
 	CreateSwapChain();
+	CacheSwapChainImage();
+	CreateSwapChainImageView();
+	CreateSwapChainRenderPass();
+	CreateSwapChainFrameBuffer();
 }
 
 void SwapChain::CreateSwapChain()
 {
-	SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport();
+	SwapChainSupportDetails swapChainSupport = mApp->QuerySwapChainSupport(mApp->vulkanDevice->physicalDevice);
 	mSwapChainFormat = PickSurfaceFormat(swapChainSupport.formats);
 	VkPresentModeKHR presentMode = PickPresentMode(swapChainSupport.presentModes);
 	mSwapChainExtent = PickExtent(swapChainSupport.capabilities);
@@ -25,7 +30,7 @@ void SwapChain::CreateSwapChain()
 
 	VkSwapchainCreateInfoKHR createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-	createInfo.surface = mSurface;
+	createInfo.surface = mApp->mSurface;
 	createInfo.minImageCount = mImageCount;
 	createInfo.imageFormat = mSwapChainFormat.format;
 	createInfo.imageColorSpace = mSwapChainFormat.colorSpace;
@@ -75,46 +80,110 @@ SwapChainFrameBuffer SwapChain::GetFrameBuffer(uint32_t availableIndex)
 	return mSwapChainFrameBuffers[availableIndex];
 }
 
-void SwapChain::CreateSurface()
-{
-	VK_CHECK_RESULT(glfwCreateWindowSurface(mApp->instance, mApp->window, nullptr, &mSurface))
-}
-
 void SwapChain::CreateSwapChainImageView()
 {
-}
+	for (size_t i = 0; i < mSwapChainFrameBuffers.size(); ++i)
+	{
+		VkImageViewCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		createInfo.image = mSwapChainFrameBuffers[i].mColorAttachment.image;
+		createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		createInfo.format = mSwapChainFrameBuffers[i].mColorAttachment.format;
 
-void SwapChain::CreateSwapChainRenderPass()
-{
+		createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+		createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		createInfo.subresourceRange.baseMipLevel = 0;
+		createInfo.subresourceRange.levelCount = 1;
+		createInfo.subresourceRange.baseArrayLayer = 0;
+		createInfo.subresourceRange.layerCount = 1;
+
+		VK_CHECK_RESULT(vkCreateImageView(mApp->vulkanDevice->logicalDevice, &createInfo, nullptr, &mSwapChainFrameBuffers[i].mColorAttachment.view))
+	}
 }
 
 void SwapChain::CreateSwapChainFrameBuffer()
 {
+	//Image view must created before call this function.
+	//Render pass must built before call this function.
+	for (int i = 0; i < mSwapChainFrameBuffers.size(); ++i)
+	{
+		VkFramebufferCreateInfo frameBufferCI = {};
+		frameBufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		frameBufferCI.pNext = nullptr;
+		frameBufferCI.renderPass = mSwapChainFrameBuffers[i].mRenderPass;
+		frameBufferCI.attachmentCount = 1;
+		frameBufferCI.pAttachments = &mSwapChainFrameBuffers[i].mColorAttachment.view;
+		frameBufferCI.width = mSwapChainFrameBuffers[i].mWidth;
+		frameBufferCI.height = mSwapChainFrameBuffers[i].mHeight;
+		frameBufferCI.layers = 1;
+
+		VK_CHECK_RESULT(vkCreateFramebuffer(mApp->vulkanDevice->logicalDevice, &frameBufferCI, nullptr, &mSwapChainFrameBuffers[i].mFramebuffer))
+	}
 }
 
-SwapChainSupportDetails SwapChain::QuerySwapChainSupport()
+void SwapChain::CreateSwapChainRenderPass()
 {
-	SwapChainSupportDetails details;
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mApp->vulkanDevice->physicalDevice, mSurface, &details.capabilities);
-
-	uint32_t formatCount;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(mApp->vulkanDevice->physicalDevice, mSurface, &formatCount, nullptr);
-
-	if(formatCount != 0)
+	//Swap chain framebuffer use only one color attachment.
+	//Color attachment layout: Render(write) -> Read(Present)
+	for (int i = 0; i < mSwapChainFrameBuffers.size(); ++i)
 	{
-		details.formats.resize(formatCount);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(mApp->vulkanDevice->physicalDevice, mSurface, &formatCount, details.formats.data());
-	}
+		VkAttachmentDescription colorAttachmentDesc = {};
+		colorAttachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;//Do not deal with multi-sample yet.
+		colorAttachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		colorAttachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;//Store attachment data after rendering for present.
+		colorAttachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		colorAttachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		colorAttachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		colorAttachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;//TODO: What if layout changed between the middle of operation?
+		colorAttachmentDesc.format = mSwapChainFrameBuffers[i].mColorAttachment.format;
 
-	uint32_t presentModeCount;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(mApp->vulkanDevice->physicalDevice, mSurface, &presentModeCount, nullptr);
+		VkAttachmentReference colorAttachRef = {};
+		colorAttachRef.attachment = 0;
+		colorAttachRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-	if (presentModeCount != 0)
-	{
-		details.presentModes.resize(presentModeCount);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(mApp->vulkanDevice->physicalDevice, mSurface, &presentModeCount, details.presentModes.data());
+		VkSubpassDescription subpassDesc = {};
+		subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpassDesc.colorAttachmentCount = 1;
+		subpassDesc.pColorAttachments = &colorAttachRef;
+		subpassDesc.pDepthStencilAttachment = VK_NULL_HANDLE;
+		subpassDesc.inputAttachmentCount = 0;
+		subpassDesc.pInputAttachments = nullptr;
+		subpassDesc.preserveAttachmentCount = 0;
+		subpassDesc.pPreserveAttachments = nullptr;
+		subpassDesc.pResolveAttachments = nullptr;
+
+		std::array<VkSubpassDependency, 2> dependencies;
+		dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+		dependencies[0].dstSubpass = 0;
+		dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+		dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+		dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		dependencies[1].srcSubpass = 0;
+		dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+		dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+		dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+		dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		VkRenderPassCreateInfo swapChainRenderPassCI = {};
+		swapChainRenderPassCI.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		swapChainRenderPassCI.attachmentCount = 1;
+		swapChainRenderPassCI.pAttachments = &colorAttachmentDesc;
+		swapChainRenderPassCI.subpassCount = 1;
+		swapChainRenderPassCI.pSubpasses = &subpassDesc;
+		swapChainRenderPassCI.dependencyCount = static_cast<uint32_t>(dependencies.size());
+		swapChainRenderPassCI.pDependencies = dependencies.data();
+
+		VK_CHECK_RESULT(vkCreateRenderPass(mApp->vulkanDevice->logicalDevice, &swapChainRenderPassCI, nullptr, &mSwapChainFrameBuffers[i].mRenderPass));
 	}
-	return details;
 }
 
 VkSurfaceFormatKHR SwapChain::PickSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats)

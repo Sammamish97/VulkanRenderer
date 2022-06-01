@@ -28,6 +28,7 @@
 #include "Object.h"
 #include "UniformStructure.h"
 #include "FrameBuffer.h"
+#include "SwapChain.h"
 
 const uint32_t WIDTH = 1080;
 const uint32_t HEIGHT = 720;
@@ -79,6 +80,9 @@ private:
 	void cleanup();
 
 private:
+	SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice physicalDevice);
+	void CreateSurface();
+	void createSwapChain();
 	void createGRenderPass();
 	void createGFramebuffer();
 	void createSampler();
@@ -92,11 +96,6 @@ private:
 	void buildGCommandBuffer();
 	void drawFrame();
 	void updateUniformBuffer(uint32_t currentImage);
-
-	void createSwapChain();
-	void createSwapChainImageViews();
-	void createSwapChainRenderPass();
-	void createSwapChainFrameBuffer();
 
 	//void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 	void createSyncObjects();
@@ -116,7 +115,7 @@ private:
 	void setupDebugMessenger();
 	static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
 	static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn);
-	void createSurface();
+
 	void createDeviceModule();
 	void createDepthResources(VkImage depthImage, VkDeviceMemory memory);
 
@@ -127,10 +126,6 @@ private:
 
 	bool isDeviceSuitable(VkPhysicalDevice device);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
-	VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
-	VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
-	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 	VkPhysicalDevice pickPhysicalDevice();
 	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 	void createInstance();
@@ -171,13 +166,10 @@ private:
 
 	//API
 	VulkanDevice* vulkanDevice;
+	SwapChain* mSwapChain;
 	VkDescriptorPool descriptorPool;
-
-	VkSwapchainKHR swapChain;
-	std::vector<SwapChainFrameBuffer> mSwapChainFrameBufers;
-	VkRenderPass mGlobalSwapChainRenderPass;
-	VkExtent2D swapChainExtent;
-
+	VkSurfaceKHR mSurface;
+	
 	GLFWwindow* window = nullptr;
 
 	std::chrono::system_clock::time_point frameStart;
@@ -200,7 +192,6 @@ private:
 	std::vector<Object*> objects;
 
 	Camera* camera;
-	
 
 	UniformBufferLights lightsData;
 
@@ -224,8 +215,6 @@ private:
 	VkSampler colorSampler;
 
 	VkDebugUtilsMessengerEXT debugMessenger;
-
-	VkSurfaceKHR surface;
 
 	VkCommandBuffer GCommandBuffer;
 	VkCommandBuffer LightingCommandBuffer;

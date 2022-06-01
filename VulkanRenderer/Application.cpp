@@ -87,17 +87,15 @@ void HelloTriangleApplication::initVulkan()
 {
 	createInstance();
 	setupDebugMessenger();
-	createSurface();
+
 	createDeviceModule();
+	createSwapChain();
 
 	loadMeshAndObjects();
 	createLight();
 	createCamera();
 
-	createSwapChain();
-	createSwapChainImageViews();
-	createSwapChainRenderPass();
-	createSwapChainFrameBuffer();
+	//Create SwapChain here
 
 	createGRenderPass();
 	createGFramebuffer();
@@ -430,7 +428,7 @@ void HelloTriangleApplication::createDepthResources(VkImage depthImage, VkDevice
 	//TODO: Temporary code.
 	VkFormat depthFormat = findDepthFormat();
 
-	createImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+	createImage(mSwapChain->mSwapChainExtent.width, mSwapChain->mSwapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		depthImage, memory);
 	auto depthImageView = createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
@@ -871,6 +869,7 @@ void HelloTriangleApplication::createGraphicsPipelines()
 		initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
+	//Need to know swap chain index for get proper swap chain image.
 	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(LightPipelineLayout, mGlobalSwapChainRenderPass);
 	pipelineCI.pInputAssemblyState = &inputAssemblyState;
 	pipelineCI.pRasterizationState = &rasterizationState;
@@ -987,7 +986,7 @@ void HelloTriangleApplication::buildLightCommandBuffer(int swapChianIndex)
 	clearValues[1].depthStencil = { 1.f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
-	renderPassBeginInfo.renderPass = mSwapChainFrameBufers[swapChianIndex].renderPass;
+	renderPassBeginInfo.renderPass = mSwapChain->mSwapChainFrameBuffers[swapChianIndex].mRenderPass;
 	renderPassBeginInfo.renderArea.offset.x = 0;
 	renderPassBeginInfo.renderArea.offset.y = 0;
 	renderPassBeginInfo.renderArea.extent.width = WIDTH;
@@ -995,7 +994,7 @@ void HelloTriangleApplication::buildLightCommandBuffer(int swapChianIndex)
 	renderPassBeginInfo.clearValueCount = 2;
 	renderPassBeginInfo.pClearValues = clearValues;
 
-	renderPassBeginInfo.framebuffer = mSwapChainFrameBufers[swapChianIndex].framebuffer;
+	renderPassBeginInfo.framebuffer = mSwapChain->mSwapChainFrameBuffers[swapChianIndex].mFramebuffer;
 
 	VK_CHECK_RESULT(vkBeginCommandBuffer(LightingCommandBuffer, &cmdBufInfo))
 	vkCmdBeginRenderPass(LightingCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -1028,7 +1027,6 @@ VkPipelineShaderStageCreateInfo HelloTriangleApplication::createShaderStageCreat
 	vertShaderStageInfo.module = shaderModule;
 	vertShaderStageInfo.pName = "main";
 
-	//!!: 여기서 임시변수로 값을 넘기며 문제가 일어날 수 있다!
 	return vertShaderStageInfo;
 }
 
@@ -1052,7 +1050,8 @@ void HelloTriangleApplication::drawFrame()
 	vkWaitForFences(vulkanDevice->logicalDevice, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
 
 	uint32_t imageindex;
-	VkResult result = vkAcquireNextImageKHR(vulkanDevice->logicalDevice, swapChain, UINT64_MAX, presentComplete, VK_NULL_HANDLE, &imageindex);
+	VkResult result = vkAcquireNextImageKHR(vulkanDevice->logicalDevice, mSwapChain->mSwapChain, UINT64_MAX, presentComplete, VK_NULL_HANDLE, &imageindex);
+
 
 	buildGCommandBuffer();
 	buildLightCommandBuffer(imageindex);
@@ -1105,7 +1104,7 @@ void HelloTriangleApplication::drawFrame()
 	presentInfo.waitSemaphoreCount = 1;
 	presentInfo.pWaitSemaphores = &renderComplete;
 
-	VkSwapchainKHR swapChains[] = { swapChain };
+	VkSwapchainKHR swapChains[] = { mSwapChain->mSwapChain };
 	presentInfo.swapchainCount = 1;
 	presentInfo.pSwapchains = swapChains;
 	presentInfo.pImageIndices = &imageindex;
@@ -1134,7 +1133,7 @@ void HelloTriangleApplication::updateUniformBuffer(uint32_t currentImage)
 
 	UniformBufferMat ubo{};
 	ubo.view = camera->getViewMatrix();
-	ubo.proj = glm::perspective(glm::radians(45.f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.f);
+	ubo.proj = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 0.1f, 100.f);
 	ubo.proj[1][1] *= -1;
 	
 
@@ -1190,6 +1189,36 @@ void HelloTriangleApplication::cleanup()
 	//glfwTerminate();
 }
 
+void HelloTriangleApplication::CreateSurface()
+{
+	VK_CHECK_RESULT(glfwCreateWindowSurface(instance, window, nullptr, &mSurface))
+}
+
+SwapChainSupportDetails HelloTriangleApplication::QuerySwapChainSupport(VkPhysicalDevice physicalDevice)
+{
+	SwapChainSupportDetails details;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, mSurface, &details.capabilities);
+
+	uint32_t formatCount;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, mSurface, &formatCount, nullptr);
+
+	if (formatCount != 0)
+	{
+		details.formats.resize(formatCount);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, mSurface, &formatCount, details.formats.data());
+	}
+
+	uint32_t presentModeCount;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, mSurface, &presentModeCount, nullptr);
+
+	if (presentModeCount != 0)
+	{
+		details.presentModes.resize(presentModeCount);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, mSurface, &presentModeCount, details.presentModes.data());
+	}
+	return details;
+}
+
 VkImageView HelloTriangleApplication::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
 {
 	VkImageViewCreateInfo viewInfo{};
@@ -1211,182 +1240,6 @@ VkImageView HelloTriangleApplication::createImageView(VkImage image, VkFormat fo
 	return imageView;
 }
 
-void HelloTriangleApplication::createSwapChain()
-{
-	SwapChainSupportDetails swapChainSupport = querySwapChainSupport(vulkanDevice->physicalDevice);
-
-	VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
-	VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-	VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
-
-	uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
-
-	if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)
-	{
-		imageCount = swapChainSupport.capabilities.maxImageCount;
-	}
-
-	VkSwapchainCreateInfoKHR createInfo{};
-	createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-	createInfo.surface = surface;
-	createInfo.minImageCount = imageCount;
-	createInfo.imageFormat = surfaceFormat.format;
-	createInfo.imageColorSpace = surfaceFormat.colorSpace;
-	createInfo.imageExtent = extent;
-	createInfo.imageArrayLayers = 1;
-	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-	auto indices = vulkanDevice->queueFamilyIndices;
-	
-	createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	createInfo.queueFamilyIndexCount = 0;
-	createInfo.pQueueFamilyIndices = nullptr;
-	
-	createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
-	createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	createInfo.presentMode = presentMode;
-	createInfo.clipped = VK_TRUE;
-	createInfo.oldSwapchain = VK_NULL_HANDLE;
-
-	if (vkCreateSwapchainKHR(vulkanDevice->logicalDevice, &createInfo, nullptr, &swapChain) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to create swap chain!");
-	}
-
-	std::vector<VkImage> swapChainImages;
-	vkGetSwapchainImagesKHR(vulkanDevice->logicalDevice, swapChain, &imageCount, nullptr);
-	swapChainImages.resize(imageCount);
-
-	vkGetSwapchainImagesKHR(vulkanDevice->logicalDevice, swapChain, &imageCount, swapChainImages.data());
-
-	for(uint32_t i = 0; i < imageCount; ++i)
-	{
-		mSwapChainFrameBufers.push_back(SwapChainFrameBuffer(extent.width, extent.height));
-		mSwapChainFrameBufers[i].colorAttachment.image = swapChainImages[i];
-		mSwapChainFrameBufers[i].colorAttachment.format = surfaceFormat.format;
-	}
-	swapChainExtent = extent;
-}
-
-
-void HelloTriangleApplication::createSwapChainImageViews()
-{
-	for (size_t i = 0; i < mSwapChainFrameBufers.size(); ++i)
-	{
-		VkImageViewCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		createInfo.image = mSwapChainFrameBufers[i].colorAttachment.image;
-		createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		createInfo.format = mSwapChainFrameBufers[i].colorAttachment.format;
-
-		createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-		createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		createInfo.subresourceRange.baseMipLevel = 0;
-		createInfo.subresourceRange.levelCount = 1;
-		createInfo.subresourceRange.baseArrayLayer = 0;
-		createInfo.subresourceRange.layerCount = 1;
-
-		if (vkCreateImageView(vulkanDevice->logicalDevice, &createInfo, nullptr, &mSwapChainFrameBufers[i].colorAttachment.view) != VK_SUCCESS)
-		{
-			throw std::runtime_error("failed to create image views!");
-		}
-	}
-}
-
-void HelloTriangleApplication::createSwapChainRenderPass()
-{
-	for (size_t i = 0; i < mSwapChainFrameBufers.size(); ++i)
-	{
-		VkAttachmentDescription attachmentDescription = {};
-		attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-		attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		attachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		attachmentDescription.format = mSwapChainFrameBufers[i].colorAttachment.format;
-
-		VkAttachmentReference colorReference = {};
-		colorReference.attachment = 0;//If attachment descriptor is array, this value is index of array.
-		colorReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		VkSubpassDescription subpassDesc = {};
-		subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpassDesc.colorAttachmentCount = 1;
-		subpassDesc.pColorAttachments = &colorReference;
-		subpassDesc.pDepthStencilAttachment = VK_NULL_HANDLE;
-		subpassDesc.inputAttachmentCount = 0;
-		subpassDesc.pInputAttachments = nullptr;
-		subpassDesc.preserveAttachmentCount = 0;
-		subpassDesc.pPreserveAttachments = nullptr;
-		subpassDesc.pResolveAttachments = nullptr;
-
-		// Use subpass dependencies for attachment layout transitions
-		std::array<VkSubpassDependency, 2> dependencies;
-
-		dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-		dependencies[0].dstSubpass = 0;
-		dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-		dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-		dependencies[1].srcSubpass = 0;
-		dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-		dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-		dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-		VkRenderPassCreateInfo swapChainRenderPassCI = {};
-		swapChainRenderPassCI.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		swapChainRenderPassCI.attachmentCount = 1;
-		swapChainRenderPassCI.pAttachments = &attachmentDescription;
-		swapChainRenderPassCI.subpassCount = 1;
-		swapChainRenderPassCI.pSubpasses = &subpassDesc;
-		swapChainRenderPassCI.dependencyCount = static_cast<uint32_t>(dependencies.size());
-		swapChainRenderPassCI.pDependencies = dependencies.data();
-
-		VK_CHECK_RESULT(vkCreateRenderPass(vulkanDevice->logicalDevice, &swapChainRenderPassCI, nullptr, &mSwapChainFrameBufers[i].renderPass));
-	}
-
-	mGlobalSwapChainRenderPass = mSwapChainFrameBufers[0].renderPass;
-}
-
-void HelloTriangleApplication::createSwapChainFrameBuffer()
-{
-	for(int i = 0; i < mSwapChainFrameBufers.size(); ++i)
-	{
-		VkFramebufferCreateInfo frameBufferCI = {};
-		frameBufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		frameBufferCI.pNext = nullptr;
-		frameBufferCI.renderPass = mSwapChainFrameBufers[i].renderPass;
-		frameBufferCI.attachmentCount = 1;
-		frameBufferCI.pAttachments = &mSwapChainFrameBufers[i].colorAttachment.view;
-		frameBufferCI.width = mSwapChainFrameBufers[i].mWidth;
-		frameBufferCI.height = mSwapChainFrameBufers[i].mHeight;
-		frameBufferCI.layers = 1;
-
-		VK_CHECK_RESULT(vkCreateFramebuffer(vulkanDevice->logicalDevice, &frameBufferCI, nullptr, &mSwapChainFrameBufers[i].framebuffer))
-	}
-}
-
-
-void HelloTriangleApplication::createSurface()
-{
-	if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to create window surface!");
-	}
-}
-
 bool HelloTriangleApplication::isDeviceSuitable(VkPhysicalDevice device)
 {
 	bool extensionsSupported = checkDeviceExtensionSupport(device);
@@ -1394,7 +1247,7 @@ bool HelloTriangleApplication::isDeviceSuitable(VkPhysicalDevice device)
 	bool swapChainAdequate = false;
 	if (extensionsSupported)
 	{
-		SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+		SwapChainSupportDetails swapChainSupport =QuerySwapChainSupport(device);
 		swapChainAdequate = (swapChainSupport.formats.empty() == false) && (swapChainSupport.presentModes.empty() == false);
 	}
 	return extensionsSupported && swapChainAdequate;
@@ -1415,79 +1268,6 @@ bool HelloTriangleApplication::checkDeviceExtensionSupport(VkPhysicalDevice devi
 		requiredExtensions.erase(extension.extensionName);
 	}
 	return requiredExtensions.empty();
-}
-
-SwapChainSupportDetails HelloTriangleApplication::querySwapChainSupport(VkPhysicalDevice device)
-{
-	SwapChainSupportDetails details;
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
-
-	uint32_t formatCount;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
-
-	if (formatCount != 0)
-	{
-		details.formats.resize(formatCount);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
-	}
-
-	uint32_t presentModeCount;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
-
-	if (presentModeCount != 0)
-	{
-		details.presentModes.resize(presentModeCount);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
-	}
-	return details;
-}
-
-VkSurfaceFormatKHR HelloTriangleApplication::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats)
-{
-	for (const auto& availableFormat : availableFormats)
-	{
-		if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-		{
-			return availableFormat;
-		}
-	}
-
-	return availableFormats[0];
-}
-
-VkPresentModeKHR HelloTriangleApplication::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes)
-{
-	for (const auto& availablePresentMode : availablePresentModes)
-	{
-		if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
-		{
-			return availablePresentMode;
-		}
-	}
-	return VK_PRESENT_MODE_FIFO_KHR;
-}
-
-VkExtent2D HelloTriangleApplication::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities)
-{
-	if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) 
-	{
-		return capabilities.currentExtent;
-	}
-	else 
-	{
-		int width, height;
-		glfwGetFramebufferSize(window, &width, &height);
-
-		VkExtent2D actualExtent = {
-			static_cast<uint32_t>(width),
-			static_cast<uint32_t>(height)
-		};
-
-		actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-		actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-
-		return actualExtent;
-	}
 }
 
 VkPhysicalDevice HelloTriangleApplication::pickPhysicalDevice()
@@ -1609,6 +1389,10 @@ void HelloTriangleApplication::createInstance()
 	}
 }
 
+void HelloTriangleApplication::createSwapChain()
+{
+	mSwapChain = new SwapChain(this);
+}
 
 
 void HelloTriangleApplication::checkExtensions()
@@ -1869,4 +1653,3 @@ void HelloTriangleApplication::PrepareGBuffer()
 	sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 	VK_CHECK_RESULT(vkCreateSampler(vulkanDevice->logicalDevice, &sampler, nullptr, &colorSampler));
 }
-
