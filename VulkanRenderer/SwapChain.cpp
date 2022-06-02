@@ -1,17 +1,21 @@
 #include "SwapChain.h"
-#include "Application.h"
+#include "VkApp.h"
 #include "VulkanTools.h"
 #include "VulkanInitializers.hpp"
+#include "Shader.h"
 #include <GLFW/glfw3.h>
 
-SwapChain::SwapChain(HelloTriangleApplication* vkApp)
+SwapChain::SwapChain(VkApp* vkApp)
 	:mApp(vkApp)
 {
+	CreateSwapChainShader();
 	CreateSwapChain();
 	CacheSwapChainImage();
 	CreateSwapChainImageView();
 	CreateSwapChainRenderPass();
 	CreateSwapChainFrameBuffer();
+	CreateSwapChainPipelineLayout();
+	CreateSwapChainPipeline();
 }
 
 void SwapChain::CreateSwapChain()
@@ -50,6 +54,12 @@ void SwapChain::CreateSwapChain()
 	createInfo.oldSwapchain = VK_NULL_HANDLE;
 
 	VK_CHECK_RESULT(vkCreateSwapchainKHR(mApp->vulkanDevice->logicalDevice, &createInfo, nullptr, &mSwapChain))
+}
+
+void SwapChain::CreateSwapChainShader()
+{
+	mLightVertShader = new Shader("../shaders/LightingVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mApp->vulkanDevice->logicalDevice);
+	mLightFragShader = new Shader("../shaders/LightingFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mApp->vulkanDevice->logicalDevice);
 }
 
 void SwapChain::CacheSwapChainImage()
@@ -231,7 +241,7 @@ VkExtent2D SwapChain::PickExtent(const VkSurfaceCapabilitiesKHR& capabilities)
 		return actualExtent;
 	}
 }
-//SwapChain은 이론상 하나의 color attachment에 있는 값을 화면에 띄워주기만 하면 된다.
+
 void SwapChain::CreateSwapChainPipelineLayout()
 {
 	VkPipelineLayoutCreateInfo pipelineLayoutCI = initializers::pipelineLayoutCreateInfo(nullptr, 0);
@@ -277,8 +287,8 @@ void SwapChain::CreateSwapChainPipeline()
 		pipelineCI.pStages = shaderStages.data();
 
 		rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
-		shaderStages[0] = createShaderStageCreateInfo("../shaders/LightingVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mApp->vulkanDevice->logicalDevice);
-		shaderStages[1] = createShaderStageCreateInfo("../shaders/LightingFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mApp->vulkanDevice->logicalDevice);
+		shaderStages[0] = mLightVertShader->GetShaderStageCreateInfo(mApp->vulkanDevice->logicalDevice);
+		shaderStages[1] = mLightFragShader->GetShaderStageCreateInfo(mApp->vulkanDevice->logicalDevice);
 
 		VkPipelineVertexInputStateCreateInfo emptyInput = initializers::pipelineVertexInputStateCreateInfo();
 		pipelineCI.pVertexInputState = &emptyInput;

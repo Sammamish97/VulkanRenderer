@@ -401,37 +401,6 @@ namespace vks
 	}
 }
 
-VkPipelineShaderStageCreateInfo createShaderStageCreateInfo(const std::string& path,
-	VkShaderStageFlagBits stage, VkDevice device)
-{
-	auto shaderCode = readFile(path.c_str());
-
-	VkShaderModule shaderModule = createShaderModule(shaderCode, device);
-
-	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vertShaderStageInfo.stage = stage;
-	vertShaderStageInfo.module = shaderModule;
-	vertShaderStageInfo.pName = "main";
-
-	return vertShaderStageInfo;
-}
-
-VkShaderModule createShaderModule(const std::vector<char>& code, VkDevice logicalDevice)
-{
-	VkShaderModuleCreateInfo createInfo{};
-	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	createInfo.codeSize = code.size();
-	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-	VkShaderModule shaderModule;
-	if (vkCreateShaderModule(logicalDevice, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to create shader module!");
-	}
-	return shaderModule;
-}
-
 std::vector<char> readFile(const std::string& filename)
 {
 	std::ifstream file(filename, std::ios::ate | std::ios::binary);

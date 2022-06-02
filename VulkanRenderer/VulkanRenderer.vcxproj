@@ -161,7 +161,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Application.cpp" />
+    <ClCompile Include="VkApp.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="DirLight.cpp" />
     <ClCompile Include="main.cpp" />
@@ -170,13 +170,12 @@
     <ClCompile Include="PointLight.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="SwapChain.cpp" />
-    <ClCompile Include="VkApp.cpp" />
     <ClCompile Include="VulkanBuffer.cpp" />
     <ClCompile Include="VulkanDevice.cpp" />
     <ClCompile Include="VulkanTools.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Application.h" />
+    <ClInclude Include="VkApp.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="DirLight.h" />
     <ClInclude Include="FrameBuffer.h" />
@@ -186,7 +185,6 @@
     <ClInclude Include="Shader.h" />
     <ClInclude Include="SwapChain.h" />
     <ClInclude Include="UniformStructure.h" />
-    <ClInclude Include="VkApp.h" />
     <ClInclude Include="VulkanBuffer.h" />
     <ClInclude Include="VulkanDevice.h" />
     <ClInclude Include="VulkanInitializers.hpp" />
