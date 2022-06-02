@@ -15,8 +15,8 @@ struct SwapChainFrameBuffer
 	SwapChainFrameBuffer() = default;
 	SwapChainFrameBuffer(int32_t width, int32_t height)
 		: mWidth(width), mHeight(height) {}
+
 	VkFramebuffer mFramebuffer;
-	
 	FrameBufferAttachment mColorAttachment;
 	int32_t mWidth, mHeight;
 };
@@ -24,7 +24,6 @@ struct SwapChainFrameBuffer
 struct SwapChainPipeline
 {
 	VkPipeline mPipeline;
-	VkRenderPass mRenderPass;
 	VkPipelineLayout mPipelineLayout;
 
 	VkShaderModule mVertexShaderModule;
@@ -47,6 +46,7 @@ public:
 
 	VkExtent2D mSwapChainExtent;
 	VkSurfaceFormatKHR mSwapChainFormat;
+	VkRenderPass mSwapChainRenderPass;
 	uint32_t mImageCount = 0;
 	
 	std::vector<SwapChainRenderData> mSwapChainRenderDatas;
@@ -56,7 +56,7 @@ private:
 
 public:
 	SwapChain(HelloTriangleApplication* vkApp);
-
+	void CleanUp();
 public:
 	void CreateSwapChain();
 	VkSwapchainKHR GetSwapChain();

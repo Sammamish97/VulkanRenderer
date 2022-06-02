@@ -143,8 +143,6 @@ private:
 
 	void PrepareGBuffer();
 
-	VkPipelineShaderStageCreateInfo createShaderStageCreateInfo(const std::string& path, VkShaderStageFlagBits stage);
-
 	void FrameStart();
 
 	void BuildGCommandBuffers();

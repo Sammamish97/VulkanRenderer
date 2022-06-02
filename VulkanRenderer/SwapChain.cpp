@@ -114,7 +114,7 @@ void SwapChain::CreateSwapChainFrameBuffer()
 		VkFramebufferCreateInfo frameBufferCI = {};
 		frameBufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		frameBufferCI.pNext = nullptr;
-		frameBufferCI.renderPass = mSwapChainRenderDatas[i].mPipelineData.mRenderPass;
+		frameBufferCI.renderPass = mSwapChainRenderPass;
 		frameBufferCI.attachmentCount = 1;
 		frameBufferCI.pAttachments = &mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.view;
 		frameBufferCI.width = mSwapChainRenderDatas[i].mFrameBufferData.mWidth;
@@ -129,61 +129,60 @@ void SwapChain::CreateSwapChainRenderPass()
 {
 	//Swap chain framebuffer use only one color attachment.
 	//Color attachment layout: Render(write) -> Read(Present)
-	for (int i = 0; i < mSwapChainRenderDatas.size(); ++i)
-	{
-		VkAttachmentDescription colorAttachmentDesc = {};
-		colorAttachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;//Do not deal with multi-sample yet.
-		colorAttachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		colorAttachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;//Store attachment data after rendering for present.
-		colorAttachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		colorAttachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		colorAttachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		colorAttachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;//TODO: What if layout changed between the middle of operation?
-		colorAttachmentDesc.format = mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.format;
+	
+	VkAttachmentDescription colorAttachmentDesc = {};
+	colorAttachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;//Do not deal with multi-sample yet.
+	colorAttachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	colorAttachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;//Store attachment data after rendering for present.
+	colorAttachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colorAttachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	colorAttachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	colorAttachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;//TODO: What if layout changed between the middle of operation?
+	colorAttachmentDesc.format = mSwapChainFormat.format;
 
-		VkAttachmentReference colorAttachRef = {};
-		colorAttachRef.attachment = 0;
-		colorAttachRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	VkAttachmentReference colorAttachRef = {};
+	colorAttachRef.attachment = 0;
+	colorAttachRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-		VkSubpassDescription subpassDesc = {};
-		subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpassDesc.colorAttachmentCount = 1;
-		subpassDesc.pColorAttachments = &colorAttachRef;
-		subpassDesc.pDepthStencilAttachment = VK_NULL_HANDLE;
-		subpassDesc.inputAttachmentCount = 0;
-		subpassDesc.pInputAttachments = nullptr;
-		subpassDesc.preserveAttachmentCount = 0;
-		subpassDesc.pPreserveAttachments = nullptr;
-		subpassDesc.pResolveAttachments = nullptr;
+	VkSubpassDescription subpassDesc = {};
+	subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpassDesc.colorAttachmentCount = 1;
+	subpassDesc.pColorAttachments = &colorAttachRef;
+	subpassDesc.pDepthStencilAttachment = VK_NULL_HANDLE;
+	subpassDesc.inputAttachmentCount = 0;
+	subpassDesc.pInputAttachments = nullptr;
+	subpassDesc.preserveAttachmentCount = 0;
+	subpassDesc.pPreserveAttachments = nullptr;
+	subpassDesc.pResolveAttachments = nullptr;
 
-		std::array<VkSubpassDependency, 2> dependencies;
-		dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-		dependencies[0].dstSubpass = 0;
-		dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-		dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	std::array<VkSubpassDependency, 2> dependencies;
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-		dependencies[1].srcSubpass = 0;
-		dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-		dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-		dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	dependencies[1].srcSubpass = 0;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-		VkRenderPassCreateInfo swapChainRenderPassCI = {};
-		swapChainRenderPassCI.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		swapChainRenderPassCI.attachmentCount = 1;
-		swapChainRenderPassCI.pAttachments = &colorAttachmentDesc;
-		swapChainRenderPassCI.subpassCount = 1;
-		swapChainRenderPassCI.pSubpasses = &subpassDesc;
-		swapChainRenderPassCI.dependencyCount = static_cast<uint32_t>(dependencies.size());
-		swapChainRenderPassCI.pDependencies = dependencies.data();
+	VkRenderPassCreateInfo swapChainRenderPassCI = {};
+	swapChainRenderPassCI.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	swapChainRenderPassCI.attachmentCount = 1;
+	swapChainRenderPassCI.pAttachments = &colorAttachmentDesc;
+	swapChainRenderPassCI.subpassCount = 1;
+	swapChainRenderPassCI.pSubpasses = &subpassDesc;
+	swapChainRenderPassCI.dependencyCount = static_cast<uint32_t>(dependencies.size());
+	swapChainRenderPassCI.pDependencies = dependencies.data();
 
-		VK_CHECK_RESULT(vkCreateRenderPass(mApp->vulkanDevice->logicalDevice, &swapChainRenderPassCI, nullptr, &mSwapChainRenderDatas[i].mPipelineData.mRenderPass));
-	}
+	VK_CHECK_RESULT(vkCreateRenderPass(mApp->vulkanDevice->logicalDevice, &swapChainRenderPassCI, nullptr, &mSwapChainRenderPass));
+
 }
 
 VkSurfaceFormatKHR SwapChain::PickSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats)
@@ -266,7 +265,7 @@ void SwapChain::CreateSwapChainPipeline()
 		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
 		//Need to know swap chain index for get proper swap chain image.
-		VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(mSwapChainRenderDatas[i].mPipelineData.mPipelineLayout, mSwapChainRenderDatas[i].mPipelineData.mRenderPass);
+		VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(mSwapChainRenderDatas[i].mPipelineData.mPipelineLayout, mSwapChainRenderPass);
 		pipelineCI.pInputAssemblyState = &inputAssemblyState;
 		pipelineCI.pRasterizationState = &rasterizationState;
 		pipelineCI.pColorBlendState = &colorBlendState;

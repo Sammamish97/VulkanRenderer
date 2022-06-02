@@ -68,6 +68,7 @@ void HelloTriangleApplication::initVulkan()
 	createInstance();
 	setupDebugMessenger();
 
+	CreateSurface();
 	createDeviceModule();
 	createSwapChain();
 
@@ -836,7 +837,7 @@ void HelloTriangleApplication::createGraphicsPipelines()
 	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
 	//Need to know swap chain index for get proper swap chain image.
-	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(LightPipelineLayout, mGlobalSwapChainRenderPass);
+	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(LightPipelineLayout, mSwapChain->mSwapChainRenderPass);
 	pipelineCI.pInputAssemblyState = &inputAssemblyState;
 	pipelineCI.pRasterizationState = &rasterizationState;
 	pipelineCI.pColorBlendState = &colorBlendState;
@@ -848,8 +849,8 @@ void HelloTriangleApplication::createGraphicsPipelines()
 	pipelineCI.pStages = shaderStages.data();
 
 	rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
-	shaderStages[0] = createShaderStageCreateInfo("../shaders/LightingVert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-	shaderStages[1] = createShaderStageCreateInfo("../shaders/LightingFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+	shaderStages[0] = createShaderStageCreateInfo("../shaders/LightingVert.spv", VK_SHADER_STAGE_VERTEX_BIT, vulkanDevice->logicalDevice);
+	shaderStages[1] = createShaderStageCreateInfo("../shaders/LightingFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, vulkanDevice->logicalDevice);
 
 	VkPipelineVertexInputStateCreateInfo emptyInput = initializers::pipelineVertexInputStateCreateInfo();
 	pipelineCI.pVertexInputState = &emptyInput;
@@ -872,8 +873,8 @@ void HelloTriangleApplication::createGraphicsPipelines()
 	pipelineCI.pVertexInputState = &vertexInputInfo;
 	rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
 
-	shaderStages[0] = createShaderStageCreateInfo("../shaders/GBufferVert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-	shaderStages[1] = createShaderStageCreateInfo("../shaders/GBufferFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);//TODO: GBuffer GLSL 货肺 结具窃.
+	shaderStages[0] = createShaderStageCreateInfo("../shaders/GBufferVert.spv", VK_SHADER_STAGE_VERTEX_BIT, vulkanDevice->logicalDevice);
+	shaderStages[1] = createShaderStageCreateInfo("../shaders/GBufferFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, vulkanDevice->logicalDevice);//TODO: GBuffer GLSL 货肺 结具窃.
 
 	pipelineCI.renderPass = mGFrameBuffer.renderPass;
 
@@ -952,7 +953,7 @@ void HelloTriangleApplication::buildLightCommandBuffer(int swapChianIndex)
 	clearValues[1].depthStencil = { 1.f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
-	renderPassBeginInfo.renderPass = mSwapChain->mSwapChainFrameBuffers[swapChianIndex].mRenderPass;
+	renderPassBeginInfo.renderPass = mSwapChain->mSwapChainRenderPass;
 	renderPassBeginInfo.renderArea.offset.x = 0;
 	renderPassBeginInfo.renderArea.offset.y = 0;
 	renderPassBeginInfo.renderArea.extent.width = WIDTH;
@@ -960,7 +961,7 @@ void HelloTriangleApplication::buildLightCommandBuffer(int swapChianIndex)
 	renderPassBeginInfo.clearValueCount = 2;
 	renderPassBeginInfo.pClearValues = clearValues;
 
-	renderPassBeginInfo.framebuffer = mSwapChain->mSwapChainFrameBuffers[swapChianIndex].mFramebuffer;
+	renderPassBeginInfo.framebuffer = mSwapChain->mSwapChainRenderDatas[swapChianIndex].mFrameBufferData.mFramebuffer;
 
 	VK_CHECK_RESULT(vkBeginCommandBuffer(LightingCommandBuffer, &cmdBufInfo))
 	vkCmdBeginRenderPass(LightingCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
