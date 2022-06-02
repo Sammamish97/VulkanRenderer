@@ -4,40 +4,52 @@
 
 class HelloTriangleApplication;
 
-struct SwapChainFrameBuffer
-{
-	SwapChainFrameBuffer() = default;
-	SwapChainFrameBuffer(int32_t width, int32_t height)
-		: mWidth(width), mHeight(height) {}
-
-	int32_t mWidth, mHeight;
-	VkFramebuffer mFramebuffer;
-	FrameBufferAttachment mColorAttachment;
-	FrameBufferAttachment mDepthAttachment;
-	VkRenderPass mRenderPass;
-};
-
 struct SwapChainSupportDetails
 {
 	VkSurfaceCapabilitiesKHR capabilities;
 	std::vector<VkSurfaceFormatKHR> formats;
 	std::vector<VkPresentModeKHR> presentModes;
 };
+struct SwapChainFrameBuffer
+{
+	SwapChainFrameBuffer() = default;
+	SwapChainFrameBuffer(int32_t width, int32_t height)
+		: mWidth(width), mHeight(height) {}
+	VkFramebuffer mFramebuffer;
+	
+	FrameBufferAttachment mColorAttachment;
+	int32_t mWidth, mHeight;
+};
+
+struct SwapChainPipeline
+{
+	VkPipeline mPipeline;
+	VkRenderPass mRenderPass;
+	VkPipelineLayout mPipelineLayout;
+
+	VkShaderModule mVertexShaderModule;
+	VkShaderModule mFragmentShaderModule;
+};
+
+struct SwapChainRenderData
+{
+	SwapChainRenderData(int32_t width, int32_t height)
+		: mFrameBufferData(width, height){}
+	SwapChainFrameBuffer mFrameBufferData;
+	SwapChainPipeline mPipelineData;
+};
+
 
 class SwapChain
 {
 public:
 	VkSwapchainKHR mSwapChain;
 
-	VkRenderPass mGlobalSwapChainRenderPass;
-
 	VkExtent2D mSwapChainExtent;
 	VkSurfaceFormatKHR mSwapChainFormat;
-	
-	std::vector<SwapChainFrameBuffer> mSwapChainFrameBuffers;
-
 	uint32_t mImageCount = 0;
-	//Pipeline
+	
+	std::vector<SwapChainRenderData> mSwapChainRenderDatas;
 
 private:
 	HelloTriangleApplication* mApp = nullptr;
@@ -55,6 +67,8 @@ private:
 	void CreateSwapChainImageView();
 	void CreateSwapChainRenderPass();
 	void CreateSwapChainFrameBuffer();
+	void CreateSwapChainPipeline();
+	void CreateSwapChainPipelineLayout();
 
 	VkSurfaceFormatKHR PickSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 	VkPresentModeKHR PickPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);

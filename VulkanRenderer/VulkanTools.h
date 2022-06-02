@@ -53,6 +53,9 @@
 
 const std::string getAssetPath();
 
+VkShaderModule createShaderModule(const std::vector<char>& code, VkDevice logicalDevice);
+VkPipelineShaderStageCreateInfo createShaderStageCreateInfo(const std::string& path, VkShaderStageFlagBits stage, VkDevice logicalDevice);
+std::vector<char> readFile(const std::string& filename);
 namespace vks
 {
 	namespace tools

@@ -168,6 +168,7 @@
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="PointLight.cpp" />
+    <ClCompile Include="Shader.cpp" />
     <ClCompile Include="SwapChain.cpp" />
     <ClCompile Include="VkApp.cpp" />
     <ClCompile Include="VulkanBuffer.cpp" />
@@ -182,6 +183,7 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="PointLight.h" />
+    <ClInclude Include="Shader.h" />
     <ClInclude Include="SwapChain.h" />
     <ClInclude Include="UniformStructure.h" />
     <ClInclude Include="VkApp.h" />

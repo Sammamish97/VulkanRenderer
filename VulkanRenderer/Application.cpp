@@ -34,26 +34,6 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 	}
 }
 
-std::vector<char> readFile(const std::string& filename)
-{
-	std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-	if (file.is_open() == false)
-	{
-		throw std::runtime_error("failed to open file!");
-	}
-
-	size_t fileSize = (size_t)file.tellg();
-	std::vector<char> buffer(fileSize);
-
-	file.seekg(0);
-	file.read(buffer.data(), fileSize);
-
-	file.close();
-
-	return buffer;
-}
-
 /*************************************************/
 
 void HelloTriangleApplication::run()
@@ -833,20 +813,6 @@ void HelloTriangleApplication::createGRenderPass()
 	VK_CHECK_RESULT(vkCreateRenderPass(vulkanDevice->logicalDevice, &renderPassInfo, nullptr, &mGFrameBuffer.renderPass));
 }
 
-VkShaderModule HelloTriangleApplication::createShaderModule(const std::vector<char>& code)
-{
-	VkShaderModuleCreateInfo createInfo{};
-	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	createInfo.codeSize = code.size();
-	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-	VkShaderModule shaderModule;
-	if (vkCreateShaderModule(vulkanDevice->logicalDevice, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to create shader module!");
-	}
-	return shaderModule;
-}
 
 void HelloTriangleApplication::createGraphicsPipelines()
 {
@@ -1012,22 +978,6 @@ void HelloTriangleApplication::buildLightCommandBuffer(int swapChianIndex)
 	vkCmdEndRenderPass(LightingCommandBuffer);
 
 	VK_CHECK_RESULT(vkEndCommandBuffer(LightingCommandBuffer));
-}
-
-VkPipelineShaderStageCreateInfo HelloTriangleApplication::createShaderStageCreateInfo(const std::string& path,
-                                                                                      VkShaderStageFlagBits stage)
-{
-	auto shaderCode = readFile(path.c_str());
-
-	VkShaderModule shaderModule = createShaderModule(shaderCode);
-
-	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vertShaderStageInfo.stage = stage;
-	vertShaderStageInfo.module = shaderModule;
-	vertShaderStageInfo.pName = "main";
-
-	return vertShaderStageInfo;
 }
 
 void HelloTriangleApplication::mainLoop()

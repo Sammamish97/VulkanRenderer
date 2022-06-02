@@ -64,9 +64,9 @@ void SwapChain::CacheSwapChainImage()
 
 	for (uint32_t i = 0; i < imageCount; ++i)
 	{
-		mSwapChainFrameBuffers.push_back(SwapChainFrameBuffer(mSwapChainExtent.width, mSwapChainExtent.height));
-		mSwapChainFrameBuffers[i].mColorAttachment.image = swapChainImages[i];
-		mSwapChainFrameBuffers[i].mColorAttachment.format = mSwapChainFormat.format;
+		mSwapChainRenderDatas.push_back(SwapChainRenderData(mSwapChainExtent.width, mSwapChainExtent.height));
+		mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.image = swapChainImages[i];
+		mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.format = mSwapChainFormat.format;
 	}
 }
 
@@ -77,18 +77,18 @@ VkSwapchainKHR SwapChain::GetSwapChain()
 
 SwapChainFrameBuffer SwapChain::GetFrameBuffer(uint32_t availableIndex)
 {
-	return mSwapChainFrameBuffers[availableIndex];
+	return mSwapChainRenderDatas[availableIndex].mFrameBufferData;
 }
 
 void SwapChain::CreateSwapChainImageView()
 {
-	for (size_t i = 0; i < mSwapChainFrameBuffers.size(); ++i)
+	for (size_t i = 0; i < mSwapChainRenderDatas.size(); ++i)
 	{
 		VkImageViewCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		createInfo.image = mSwapChainFrameBuffers[i].mColorAttachment.image;
+		createInfo.image = mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.image;
 		createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		createInfo.format = mSwapChainFrameBuffers[i].mColorAttachment.format;
+		createInfo.format = mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.format;
 
 		createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -101,7 +101,7 @@ void SwapChain::CreateSwapChainImageView()
 		createInfo.subresourceRange.baseArrayLayer = 0;
 		createInfo.subresourceRange.layerCount = 1;
 
-		VK_CHECK_RESULT(vkCreateImageView(mApp->vulkanDevice->logicalDevice, &createInfo, nullptr, &mSwapChainFrameBuffers[i].mColorAttachment.view))
+		VK_CHECK_RESULT(vkCreateImageView(mApp->vulkanDevice->logicalDevice, &createInfo, nullptr, &mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.view))
 	}
 }
 
@@ -109,19 +109,19 @@ void SwapChain::CreateSwapChainFrameBuffer()
 {
 	//Image view must created before call this function.
 	//Render pass must built before call this function.
-	for (int i = 0; i < mSwapChainFrameBuffers.size(); ++i)
+	for (int i = 0; i < mSwapChainRenderDatas.size(); ++i)
 	{
 		VkFramebufferCreateInfo frameBufferCI = {};
 		frameBufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		frameBufferCI.pNext = nullptr;
-		frameBufferCI.renderPass = mSwapChainFrameBuffers[i].mRenderPass;
+		frameBufferCI.renderPass = mSwapChainRenderDatas[i].mPipelineData.mRenderPass;
 		frameBufferCI.attachmentCount = 1;
-		frameBufferCI.pAttachments = &mSwapChainFrameBuffers[i].mColorAttachment.view;
-		frameBufferCI.width = mSwapChainFrameBuffers[i].mWidth;
-		frameBufferCI.height = mSwapChainFrameBuffers[i].mHeight;
+		frameBufferCI.pAttachments = &mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.view;
+		frameBufferCI.width = mSwapChainRenderDatas[i].mFrameBufferData.mWidth;
+		frameBufferCI.height = mSwapChainRenderDatas[i].mFrameBufferData.mHeight;
 		frameBufferCI.layers = 1;
 
-		VK_CHECK_RESULT(vkCreateFramebuffer(mApp->vulkanDevice->logicalDevice, &frameBufferCI, nullptr, &mSwapChainFrameBuffers[i].mFramebuffer))
+		VK_CHECK_RESULT(vkCreateFramebuffer(mApp->vulkanDevice->logicalDevice, &frameBufferCI, nullptr, &mSwapChainRenderDatas[i].mFrameBufferData.mFramebuffer))
 	}
 }
 
@@ -129,7 +129,7 @@ void SwapChain::CreateSwapChainRenderPass()
 {
 	//Swap chain framebuffer use only one color attachment.
 	//Color attachment layout: Render(write) -> Read(Present)
-	for (int i = 0; i < mSwapChainFrameBuffers.size(); ++i)
+	for (int i = 0; i < mSwapChainRenderDatas.size(); ++i)
 	{
 		VkAttachmentDescription colorAttachmentDesc = {};
 		colorAttachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;//Do not deal with multi-sample yet.
@@ -139,7 +139,7 @@ void SwapChain::CreateSwapChainRenderPass()
 		colorAttachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		colorAttachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		colorAttachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;//TODO: What if layout changed between the middle of operation?
-		colorAttachmentDesc.format = mSwapChainFrameBuffers[i].mColorAttachment.format;
+		colorAttachmentDesc.format = mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.format;
 
 		VkAttachmentReference colorAttachRef = {};
 		colorAttachRef.attachment = 0;
@@ -182,7 +182,7 @@ void SwapChain::CreateSwapChainRenderPass()
 		swapChainRenderPassCI.dependencyCount = static_cast<uint32_t>(dependencies.size());
 		swapChainRenderPassCI.pDependencies = dependencies.data();
 
-		VK_CHECK_RESULT(vkCreateRenderPass(mApp->vulkanDevice->logicalDevice, &swapChainRenderPassCI, nullptr, &mSwapChainFrameBuffers[i].mRenderPass));
+		VK_CHECK_RESULT(vkCreateRenderPass(mApp->vulkanDevice->logicalDevice, &swapChainRenderPassCI, nullptr, &mSwapChainRenderDatas[i].mPipelineData.mRenderPass));
 	}
 }
 
@@ -230,5 +230,59 @@ VkExtent2D SwapChain::PickExtent(const VkSurfaceCapabilitiesKHR& capabilities)
 		actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
 		return actualExtent;
+	}
+}
+//SwapChain은 이론상 하나의 color attachment에 있는 값을 화면에 띄워주기만 하면 된다.
+void SwapChain::CreateSwapChainPipelineLayout()
+{
+	VkPipelineLayoutCreateInfo pipelineLayoutCI = initializers::pipelineLayoutCreateInfo(nullptr, 0);
+	for (int i = 0; i < mSwapChainRenderDatas.size(); ++i)
+	{
+		VK_CHECK_RESULT(vkCreatePipelineLayout(mApp->vulkanDevice->logicalDevice, &pipelineLayoutCI, nullptr, &mSwapChainRenderDatas[i].mPipelineData.mPipelineLayout))
+	}
+}
+
+void SwapChain::CreateSwapChainPipeline()
+{
+	for(int i = 0; i < mSwapChainRenderDatas.size(); ++i)
+	{
+		VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
+			initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
+		VkPipelineRasterizationStateCreateInfo rasterizationState =
+			initializers::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+		VkPipelineColorBlendAttachmentState blendAttachmentState =
+			initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
+		VkPipelineColorBlendStateCreateInfo colorBlendState =
+			initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
+		VkPipelineDepthStencilStateCreateInfo depthStencilState =
+			initializers::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+		VkPipelineViewportStateCreateInfo viewportState =
+			initializers::pipelineViewportStateCreateInfo(1, 1, 0);
+		VkPipelineMultisampleStateCreateInfo multisampleState =
+			initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
+		std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+		VkPipelineDynamicStateCreateInfo dynamicState =
+			initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
+		std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
+
+		//Need to know swap chain index for get proper swap chain image.
+		VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(mSwapChainRenderDatas[i].mPipelineData.mPipelineLayout, mSwapChainRenderDatas[i].mPipelineData.mRenderPass);
+		pipelineCI.pInputAssemblyState = &inputAssemblyState;
+		pipelineCI.pRasterizationState = &rasterizationState;
+		pipelineCI.pColorBlendState = &colorBlendState;
+		pipelineCI.pMultisampleState = &multisampleState;
+		pipelineCI.pViewportState = &viewportState;
+		pipelineCI.pDepthStencilState = &depthStencilState;
+		pipelineCI.pDynamicState = &dynamicState;
+		pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
+		pipelineCI.pStages = shaderStages.data();
+
+		rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
+		shaderStages[0] = createShaderStageCreateInfo("../shaders/LightingVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mApp->vulkanDevice->logicalDevice);
+		shaderStages[1] = createShaderStageCreateInfo("../shaders/LightingFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mApp->vulkanDevice->logicalDevice);
+
+		VkPipelineVertexInputStateCreateInfo emptyInput = initializers::pipelineVertexInputStateCreateInfo();
+		pipelineCI.pVertexInputState = &emptyInput;
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(mApp->vulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &mSwapChainRenderDatas[i].mPipelineData.mPipeline))
 	}
 }
