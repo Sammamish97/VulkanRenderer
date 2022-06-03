@@ -93,16 +93,19 @@ private:
 	void createSwapChain();
 	void createGRenderPass();
 	void createGFramebuffer();
+	void createLRenderPass();
+	void createLFramebuffer();
 	void createSampler();
 	void createUniformBuffers();
 	void createDescriptorPool();
 	void createDescriptorSetLayout();
 	void createDescriptorSet();
-	void createGraphicsPipelines();
+	void createGPipeline();
+	void createLPipeline();
 	void createCommandBuffers();
-	void buildLightCommandBuffer(int swapChianIndex);
 	void buildGCommandBuffer();
-	void drawFrame();
+	void buiilLCommandBuffer();
+	void drawFrame();//TODO
 	void updateUniformBuffer(uint32_t currentImage);
 
 	//void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
@@ -152,10 +155,6 @@ private:
 	void PrepareGBuffer();
 
 	void FrameStart();
-
-	void BuildGCommandBuffers();
-
-	void BuildLightingCommandsBuffers();
 
 	void Update();
 
@@ -214,7 +213,7 @@ private:
 	LFrameBuffer mLFrameBuffer;
 
 	VkPipeline GBufferPipeline;
-	VkPipeline LBufferPipeline;
+	VkPipeline LPipeline;
 
 	VkPipelineLayout GPipelineLayout;
 	VkPipelineLayout LPipelineLayout;
