@@ -592,7 +592,7 @@ void VkApp::createCommandBuffers()
 		throw std::runtime_error("failed to allocate command buffers!");
 	}
 
-	if (vkAllocateCommandBuffers(vulkanDevice->logicalDevice, &allocInfo, &LightingCommandBuffer) != VK_SUCCESS)
+	if (vkAllocateCommandBuffers(vulkanDevice->logicalDevice, &allocInfo, &LCommandBuffer) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to allocate command buffers!");
 	}
@@ -631,6 +631,9 @@ void VkApp::createShaders()
 {
 	mGVertShader = new Shader("../shaders/GBufferVert.spv", VK_SHADER_STAGE_VERTEX_BIT, vulkanDevice->logicalDevice);
 	mGFragShader = new Shader("../shaders/GBufferFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, vulkanDevice->logicalDevice);
+
+	mLVertShader = new Shader("../shaders/LightingVert.spv", VK_SHADER_STAGE_VERTEX_BIT, vulkanDevice->logicalDevice);
+	mLFragShader = new Shader("../shaders/LightingFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, vulkanDevice->logicalDevice);
 }
 
 void VkApp::processInput()
@@ -841,7 +844,7 @@ void VkApp::createGraphicsPipelines()
 	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
 	//Need to know swap chain index for get proper swap chain image.
-	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(GPipelineLayout, mGFrameBuffer.renderPass);
+	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(LPipelineLayout, mLFrameBuffer.renderPass);
 	pipelineCI.pInputAssemblyState = &inputAssemblyState;
 	pipelineCI.pRasterizationState = &rasterizationState;
 	pipelineCI.pColorBlendState = &colorBlendState;
@@ -953,22 +956,22 @@ void VkApp::buildLightCommandBuffer(int swapChianIndex)
 
 	renderPassBeginInfo.framebuffer = mSwapChain->mSwapChainRenderDatas[swapChianIndex].mFrameBufferData.mFramebuffer;
 
-	VK_CHECK_RESULT(vkBeginCommandBuffer(LightingCommandBuffer, &cmdBufInfo))
-	vkCmdBeginRenderPass(LightingCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+	VK_CHECK_RESULT(vkBeginCommandBuffer(LCommandBuffer, &cmdBufInfo))
+	vkCmdBeginRenderPass(LCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 	VkViewport viewport = initializers::viewport((float)WIDTH, (float)HEIGHT, 0.f, 1.f);
-	vkCmdSetViewport(LightingCommandBuffer, 0, 1, &viewport);
+	vkCmdSetViewport(LCommandBuffer, 0, 1, &viewport);
 	VkRect2D scissor = initializers::rect2D(WIDTH, HEIGHT, 0, 0);
-	vkCmdSetScissor(LightingCommandBuffer, 0, 1, &scissor);
+	vkCmdSetScissor(LCommandBuffer, 0, 1, &scissor);
 
-	vkCmdBindDescriptorSets(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mSwapChain->mSwapChainRenderDatas[swapChianIndex].mPipelineData.mPipelineLayout, 0, 1, &LightingDescriptorSet, 0, nullptr);
+	vkCmdBindDescriptorSets(LCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mSwapChain->mSwapChainRenderDatas[swapChianIndex].mPipelineData.mPipelineLayout, 0, 1, &LightingDescriptorSet, 0, nullptr);
 
-	vkCmdBindPipeline(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mSwapChain->mSwapChainRenderDatas[swapChianIndex].mPipelineData.mPipeline);
+	vkCmdBindPipeline(LCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mSwapChain->mSwapChainRenderDatas[swapChianIndex].mPipelineData.mPipeline);
 
-	vkCmdDraw(LightingCommandBuffer, 3, 1, 0, 0);
+	vkCmdDraw(LCommandBuffer, 3, 1, 0, 0);
 
-	vkCmdEndRenderPass(LightingCommandBuffer);
+	vkCmdEndRenderPass(LCommandBuffer);
 
-	VK_CHECK_RESULT(vkEndCommandBuffer(LightingCommandBuffer));
+	VK_CHECK_RESULT(vkEndCommandBuffer(LCommandBuffer));
 }
 
 void VkApp::mainLoop()
@@ -1033,7 +1036,7 @@ void VkApp::drawFrame()
 	lightSubmitInfo.pSignalSemaphores = &renderComplete;
 	lightSubmitInfo.signalSemaphoreCount = 1;
 	lightSubmitInfo.commandBufferCount = 1;
-	lightSubmitInfo.pCommandBuffers = &LightingCommandBuffer;
+	lightSubmitInfo.pCommandBuffers = &LCommandBuffer;
 	lightSubmitInfo.pWaitDstStageMask = waitStages;
 	VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &lightSubmitInfo, inFlightFence))
 

@@ -47,9 +47,9 @@ public:
 	VkRenderPass mSwapChainRenderPass;
 	uint32_t mImageCount = 0;
 
-	Shader* mLightVertShader;
-	Shader* mLightFragShader;
-	
+	Shader* mSwapChainVertexShader;//Currently not use.
+	Shader* mSwapChainFragShader;//Maybe use later.
+
 	std::vector<SwapChainRenderData> mSwapChainRenderDatas;
 
 private:
@@ -64,7 +64,6 @@ public:
 	SwapChainFrameBuffer GetFrameBuffer(uint32_t availableIndex);
 
 private:
-	void CreateSwapChainShader();
 	void CacheSwapChainImage();
 	void CreateSwapChainImageView();
 	void CreateSwapChainRenderPass();
