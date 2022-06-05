@@ -2,7 +2,7 @@
 #include <vulkan/vulkan.hpp>
 #include "FrameBuffer.h"
 
-class HelloTriangleApplication;
+class VkApp;
 
 struct SwapChainSupportDetails
 {
@@ -52,10 +52,10 @@ public:
 	std::vector<SwapChainRenderData> mSwapChainRenderDatas;
 
 private:
-	HelloTriangleApplication* mApp = nullptr;
+	VkApp* mApp = nullptr;
 
 public:
-	SwapChain(HelloTriangleApplication* vkApp);
+	SwapChain(VkApp* vkApp);
 	void CleanUp();
 public:
 	void CreateSwapChain();

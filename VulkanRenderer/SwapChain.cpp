@@ -1,10 +1,10 @@
 #include "SwapChain.h"
-#include "Application.h"
+#include "VkApp.h"
 #include "VulkanTools.h"
 #include "VulkanInitializers.hpp"
 #include <GLFW/glfw3.h>
 
-SwapChain::SwapChain(HelloTriangleApplication* vkApp)
+SwapChain::SwapChain(VkApp* vkApp)
 	:mApp(vkApp)
 {
 	CreateSwapChain();
@@ -16,7 +16,7 @@ SwapChain::SwapChain(HelloTriangleApplication* vkApp)
 
 void SwapChain::CreateSwapChain()
 {
-	SwapChainSupportDetails swapChainSupport = mApp->QuerySwapChainSupport(mApp->vulkanDevice->physicalDevice);
+	SwapChainSupportDetails swapChainSupport = mApp->QuerySwapChainSupport(mApp->mVulkanDevice->physicalDevice);
 	mSwapChainFormat = PickSurfaceFormat(swapChainSupport.formats);
 	VkPresentModeKHR presentMode = PickPresentMode(swapChainSupport.presentModes);
 	mSwapChainExtent = PickExtent(swapChainSupport.capabilities);
@@ -38,7 +38,7 @@ void SwapChain::CreateSwapChain()
 	createInfo.imageArrayLayers = 1;
 	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-	auto queueFamilyIndices = mApp->vulkanDevice->queueFamilyIndices;
+	auto queueFamilyIndices = mApp->mVulkanDevice->queueFamilyIndices;
 	createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	createInfo.queueFamilyIndexCount = 0;
 	createInfo.pQueueFamilyIndices = nullptr;//TODO: Find purpose of this codes. Family indices and this init code do not used.
@@ -49,7 +49,7 @@ void SwapChain::CreateSwapChain()
 	createInfo.clipped = VK_TRUE;
 	createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-	VK_CHECK_RESULT(vkCreateSwapchainKHR(mApp->vulkanDevice->logicalDevice, &createInfo, nullptr, &mSwapChain))
+	VK_CHECK_RESULT(vkCreateSwapchainKHR(mApp->mVulkanDevice->logicalDevice, &createInfo, nullptr, &mSwapChain))
 }
 
 void SwapChain::CacheSwapChainImage()
@@ -57,10 +57,10 @@ void SwapChain::CacheSwapChainImage()
 	uint32_t imageCount;
 
 	std::vector<VkImage> swapChainImages;
-	vkGetSwapchainImagesKHR(mApp->vulkanDevice->logicalDevice, mSwapChain, &imageCount, nullptr);
+	vkGetSwapchainImagesKHR(mApp->mVulkanDevice->logicalDevice, mSwapChain, &imageCount, nullptr);
 	swapChainImages.resize(imageCount);
 
-	vkGetSwapchainImagesKHR(mApp->vulkanDevice->logicalDevice, mSwapChain, &imageCount, swapChainImages.data());
+	vkGetSwapchainImagesKHR(mApp->mVulkanDevice->logicalDevice, mSwapChain, &imageCount, swapChainImages.data());
 
 	for (uint32_t i = 0; i < imageCount; ++i)
 	{
@@ -101,7 +101,7 @@ void SwapChain::CreateSwapChainImageView()
 		createInfo.subresourceRange.baseArrayLayer = 0;
 		createInfo.subresourceRange.layerCount = 1;
 
-		VK_CHECK_RESULT(vkCreateImageView(mApp->vulkanDevice->logicalDevice, &createInfo, nullptr, &mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.view))
+		VK_CHECK_RESULT(vkCreateImageView(mApp->mVulkanDevice->logicalDevice, &createInfo, nullptr, &mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.view))
 	}
 }
 
@@ -121,7 +121,7 @@ void SwapChain::CreateSwapChainFrameBuffer()
 		frameBufferCI.height = mSwapChainRenderDatas[i].mFrameBufferData.mHeight;
 		frameBufferCI.layers = 1;
 
-		VK_CHECK_RESULT(vkCreateFramebuffer(mApp->vulkanDevice->logicalDevice, &frameBufferCI, nullptr, &mSwapChainRenderDatas[i].mFrameBufferData.mFramebuffer))
+		VK_CHECK_RESULT(vkCreateFramebuffer(mApp->mVulkanDevice->logicalDevice, &frameBufferCI, nullptr, &mSwapChainRenderDatas[i].mFrameBufferData.mFramebuffer))
 	}
 }
 
@@ -181,7 +181,7 @@ void SwapChain::CreateSwapChainRenderPass()
 	swapChainRenderPassCI.dependencyCount = static_cast<uint32_t>(dependencies.size());
 	swapChainRenderPassCI.pDependencies = dependencies.data();
 
-	VK_CHECK_RESULT(vkCreateRenderPass(mApp->vulkanDevice->logicalDevice, &swapChainRenderPassCI, nullptr, &mSwapChainRenderPass));
+	VK_CHECK_RESULT(vkCreateRenderPass(mApp->mVulkanDevice->logicalDevice, &swapChainRenderPassCI, nullptr, &mSwapChainRenderPass));
 
 }
 
@@ -218,7 +218,7 @@ VkExtent2D SwapChain::PickExtent(const VkSurfaceCapabilitiesKHR& capabilities)
 	else
 	{
 		int width, height;
-		glfwGetFramebufferSize(mApp->window, &width, &height);
+		glfwGetFramebufferSize(mApp->mWindow, &width, &height);
 
 		VkExtent2D actualExtent = {
 			static_cast<uint32_t>(width),
@@ -237,7 +237,7 @@ void SwapChain::CreateSwapChainPipelineLayout()
 	VkPipelineLayoutCreateInfo pipelineLayoutCI = initializers::pipelineLayoutCreateInfo(nullptr, 0);
 	for (int i = 0; i < mSwapChainRenderDatas.size(); ++i)
 	{
-		VK_CHECK_RESULT(vkCreatePipelineLayout(mApp->vulkanDevice->logicalDevice, &pipelineLayoutCI, nullptr, &mSwapChainRenderDatas[i].mPipelineData.mPipelineLayout))
+		VK_CHECK_RESULT(vkCreatePipelineLayout(mApp->mVulkanDevice->logicalDevice, &pipelineLayoutCI, nullptr, &mSwapChainRenderDatas[i].mPipelineData.mPipelineLayout))
 	}
 }
 
@@ -277,11 +277,11 @@ void SwapChain::CreateSwapChainPipeline()
 		pipelineCI.pStages = shaderStages.data();
 
 		rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
-		shaderStages[0] = createShaderStageCreateInfo("../shaders/LightingVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mApp->vulkanDevice->logicalDevice);
-		shaderStages[1] = createShaderStageCreateInfo("../shaders/LightingFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mApp->vulkanDevice->logicalDevice);
+		shaderStages[0] = createShaderStageCreateInfo("../shaders/LightingVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mApp->mVulkanDevice->logicalDevice);
+		shaderStages[1] = createShaderStageCreateInfo("../shaders/LightingFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mApp->mVulkanDevice->logicalDevice);
 
 		VkPipelineVertexInputStateCreateInfo emptyInput = initializers::pipelineVertexInputStateCreateInfo();
 		pipelineCI.pVertexInputState = &emptyInput;
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(mApp->vulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &mSwapChainRenderDatas[i].mPipelineData.mPipeline))
+		VK_CHECK_RESULT(vkCreateGraphicsPipelines(mApp->mVulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &mSwapChainRenderDatas[i].mPipelineData.mPipeline))
 	}
 }

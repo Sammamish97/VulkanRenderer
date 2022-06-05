@@ -1,11 +1,12 @@
-#include "Application.h"
+#include "Demo.h"
+#include <iostream>
 int main()
 {
-	HelloTriangleApplication app;
+	Demo demo;
 
 	try
 	{
-		app.run();
+		demo.run();
 	}
 	catch (const std::exception& e)
 	{
