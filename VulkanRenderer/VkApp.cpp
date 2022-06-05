@@ -80,9 +80,6 @@ void VkApp::initVulkan()
 	//Create SwapChain here
 
 	createGRenderPass();
-	createLRenderPass();
-
-	createLFramebuffer();
 	createGFramebuffer();
 	
 	createUniformBuffers();
@@ -92,13 +89,9 @@ void VkApp::initVulkan()
 	createDescriptorSetLayout();
 	createDescriptorSet();
 
-	createGPipeline();
-	createLPipeline();
+	createGraphicsPipelines();
 
 	createCommandBuffers();
-
-	buildGCommandBuffer();
-	buiilLCommandBuffer();
 	
 	createSyncObjects();
 }
@@ -509,10 +502,7 @@ void VkApp::createDescriptorSetLayout()
 	VkDescriptorSetLayoutCreateInfo lightDescriptorLayout = initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(vulkanDevice->logicalDevice, &lightDescriptorLayout, nullptr, &LightDescriptorSetLayout))
 
-	VkPipelineLayoutCreateInfo LpipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&LightDescriptorSetLayout, 1);
-	VK_CHECK_RESULT(vkCreatePipelineLayout(vulkanDevice->logicalDevice, &LpipelineLayoutCreateInfo, nullptr, &LPipelineLayout))
-
-	//Create G descriptor set layout and pipeilne
+	//Create Lighting descriptor set layout and pipeilne
 	std::vector<VkDescriptorSetLayoutBinding> GLayoutBinding = { matLayoutBinding };
 
 	VkDescriptorSetLayoutCreateInfo GDescriptorLayout = initializers::descriptorSetLayoutCreateInfo(GLayoutBinding);
@@ -688,6 +678,40 @@ void VkApp::mouseCallback(GLFWwindow* window, double xposIn, double yposIn)
 	app->camera->ProcessMouseMovement(xoffset, yoffset);
 }
 
+void VkApp::BuildGCommandBuffers()
+{
+	VkCommandBufferBeginInfo cmdBufInfo = initializers::commandBufferBeginInfo();
+
+	VkClearValue clearValues[2];
+	clearValues[0].color = { {0.f, 0.f, 0.2f, 0.f} };
+	clearValues[1].depthStencil = { 1.f, 0 };
+	//TODO: Start from here. 
+}
+
+void VkApp::BuildLightingCommandsBuffers()
+{
+}
+
+void VkApp::createGFramebuffer()
+{
+	std::array<VkImageView, 4> attachments;
+	attachments[0] = mGFrameBuffer.position.view;
+	attachments[1] = mGFrameBuffer.normal.view;
+	attachments[2] = mGFrameBuffer.albedo.view;
+	attachments[3] = mGFrameBuffer.depth.view;
+
+	VkFramebufferCreateInfo fbufCreateInfo = {};
+	fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	fbufCreateInfo.pNext = NULL;
+	fbufCreateInfo.renderPass = mGFrameBuffer.renderPass;
+	fbufCreateInfo.pAttachments = attachments.data();
+	fbufCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+	fbufCreateInfo.width = mGFrameBuffer.width;
+	fbufCreateInfo.height = mGFrameBuffer.height;
+	fbufCreateInfo.layers = 1;
+	VK_CHECK_RESULT(vkCreateFramebuffer(vulkanDevice->logicalDevice, &fbufCreateInfo, nullptr, &mGFrameBuffer.framebuffer));
+}
+
 void VkApp::createSampler()
 {
 	VkSamplerCreateInfo sampler = initializers::samplerCreateInfo();
@@ -797,108 +821,8 @@ void VkApp::createGRenderPass()
 	VK_CHECK_RESULT(vkCreateRenderPass(vulkanDevice->logicalDevice, &renderPassInfo, nullptr, &mGFrameBuffer.renderPass));
 }
 
-void VkApp::createGFramebuffer()
-{
-	std::array<VkImageView, 4> attachments;
-	attachments[0] = mGFrameBuffer.position.view;
-	attachments[1] = mGFrameBuffer.normal.view;
-	attachments[2] = mGFrameBuffer.albedo.view;
-	attachments[3] = mGFrameBuffer.depth.view;
 
-	VkFramebufferCreateInfo fbufCreateInfo = {};
-	fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-	fbufCreateInfo.pNext = NULL;
-	fbufCreateInfo.renderPass = mGFrameBuffer.renderPass;
-	fbufCreateInfo.pAttachments = attachments.data();
-	fbufCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-	fbufCreateInfo.width = mGFrameBuffer.width;
-	fbufCreateInfo.height = mGFrameBuffer.height;
-	fbufCreateInfo.layers = 1;
-	VK_CHECK_RESULT(vkCreateFramebuffer(vulkanDevice->logicalDevice, &fbufCreateInfo, nullptr, &mGFrameBuffer.framebuffer));
-}
-
-void VkApp::createLFramebuffer()
-{
-	VkImageView attachment;
-	attachment = mLFrameBuffer.composition.view;
-
-	VkFramebufferCreateInfo fbufCreateInfo = {};
-	fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-	fbufCreateInfo.pNext = NULL;
-	fbufCreateInfo.renderPass = mLFrameBuffer.renderPass;
-	fbufCreateInfo.pAttachments = &attachment;
-	fbufCreateInfo.attachmentCount = 1;
-	fbufCreateInfo.width = mLFrameBuffer.width;
-	fbufCreateInfo.height = mLFrameBuffer.height;
-	fbufCreateInfo.layers = 1;
-	VK_CHECK_RESULT(vkCreateFramebuffer(vulkanDevice->logicalDevice, &fbufCreateInfo, nullptr, &mLFrameBuffer.framebuffer));
-}
-
-void VkApp::createLRenderPass()
-{
-	//Create Render Pass for LBuffer
-	mLFrameBuffer.width = FB_DIM;
-	mLFrameBuffer.height = FB_DIM;
-
-	// Albedo (color)
-	createAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &mLFrameBuffer.composition);
-
-	//TODO: What's different between VK_FORMAT_B8G8R8A8_SRGB and VK_FORMAT_R8G8B8A8_UNORM?
-
-	VkAttachmentDescription attachmentDesc = {};
-
-	attachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-	attachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	attachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	attachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	attachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		
-	attachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachmentDesc.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		
-	attachmentDesc.format = mLFrameBuffer.composition.format;
-
-	std::vector<VkAttachmentReference> colorReferences;
-	colorReferences.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
-
-	VkSubpassDescription subpass = {};
-	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.pColorAttachments = colorReferences.data();
-	subpass.colorAttachmentCount = static_cast<uint32_t>(colorReferences.size());
-	subpass.pDepthStencilAttachment = VK_NULL_HANDLE;
-
-	// Use subpass dependencies for attachment layout transitions
-	std::array<VkSubpassDependency, 2> dependencies;
-
-	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependencies[0].dstSubpass = 0;
-	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;//TODO: What's meaning for?
-	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;//먼저 color attachment로 붙여 MTR를 할수 있게 한다.
-	dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-	dependencies[1].srcSubpass = 0;
-	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;//Write한 color attachment를 read해서 다음 lighting shader에 넣는다.
-	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-	VkRenderPassCreateInfo renderPassInfo = {};
-	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassInfo.pAttachments = &attachmentDesc;
-	renderPassInfo.attachmentCount = 1;
-	renderPassInfo.subpassCount = 1;
-	renderPassInfo.pSubpasses = &subpass;
-	renderPassInfo.dependencyCount = 2;
-	renderPassInfo.pDependencies = dependencies.data();
-	VK_CHECK_RESULT(vkCreateRenderPass(vulkanDevice->logicalDevice, &renderPassInfo, nullptr, &mLFrameBuffer.renderPass));
-}
-
-
-void VkApp::createGPipeline()
+void VkApp::createGraphicsPipelines()
 {
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
 		initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0,VK_FALSE);
@@ -920,7 +844,7 @@ void VkApp::createGPipeline()
 	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
 	//Need to know swap chain index for get proper swap chain image.
-	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(GPipelineLayout, mGFrameBuffer.renderPass);
+	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(LPipelineLayout, mLFrameBuffer.renderPass);
 	pipelineCI.pInputAssemblyState = &inputAssemblyState;
 	pipelineCI.pRasterizationState = &rasterizationState;
 	pipelineCI.pColorBlendState = &colorBlendState;
@@ -961,50 +885,6 @@ void VkApp::createGPipeline()
 
 	VK_CHECK_RESULT(vkCreateGraphicsPipelines(vulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &GBufferPipeline))
 	// Finish create G-graphics pipeline
-}
-
-void VkApp::createLPipeline()
-{
-	VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
-		initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
-	VkPipelineRasterizationStateCreateInfo rasterizationState =
-		initializers::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
-	VkPipelineColorBlendAttachmentState blendAttachmentState =
-		initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
-	VkPipelineColorBlendStateCreateInfo colorBlendState =
-		initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
-	VkPipelineDepthStencilStateCreateInfo depthStencilState =
-		initializers::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
-	VkPipelineViewportStateCreateInfo viewportState =
-		initializers::pipelineViewportStateCreateInfo(1, 1, 0);
-	VkPipelineMultisampleStateCreateInfo multisampleState =
-		initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
-	std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-	VkPipelineDynamicStateCreateInfo dynamicState =
-		initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
-	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
-
-	//Need to know swap chain index for get proper swap chain image.
-	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(LPipelineLayout, mLFrameBuffer.renderPass);
-	pipelineCI.pInputAssemblyState = &inputAssemblyState;
-	pipelineCI.pRasterizationState = &rasterizationState;
-	pipelineCI.pColorBlendState = &colorBlendState;
-	pipelineCI.pMultisampleState = &multisampleState;
-	pipelineCI.pViewportState = &viewportState;
-	pipelineCI.pDepthStencilState = &depthStencilState;
-	pipelineCI.pDynamicState = &dynamicState;
-	pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
-	pipelineCI.pStages = shaderStages.data();
-
-	// Final fullscreen composition pass pipeline
-	rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
-	shaderStages[0] = mLVertShader->GetShaderStageCreateInfo(vulkanDevice->logicalDevice);
-	shaderStages[1] = mLFragShader->GetShaderStageCreateInfo(vulkanDevice->logicalDevice);
-	// Empty vertex input state, vertices are generated by the vertex shader
-	VkPipelineVertexInputStateCreateInfo emptyInputState = initializers::pipelineVertexInputStateCreateInfo();
-	pipelineCI.pVertexInputState = &emptyInputState;
-
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(vulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &LPipeline))
 }
 
 void VkApp::buildGCommandBuffer()
@@ -1057,7 +937,7 @@ void VkApp::buildGCommandBuffer()
 	VK_CHECK_RESULT(vkEndCommandBuffer(GCommandBuffer));
 }
 
-void VkApp::buiilLCommandBuffer()
+void VkApp::buildLightCommandBuffer(int swapChianIndex)
 {
 	VkCommandBufferBeginInfo cmdBufInfo = initializers::commandBufferBeginInfo();
 
@@ -1066,7 +946,7 @@ void VkApp::buiilLCommandBuffer()
 	clearValues[1].depthStencil = { 1.f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
-	renderPassBeginInfo.renderPass = mLFrameBuffer.renderPass;
+	renderPassBeginInfo.renderPass = mSwapChain->mSwapChainRenderPass;
 	renderPassBeginInfo.renderArea.offset.x = 0;
 	renderPassBeginInfo.renderArea.offset.y = 0;
 	renderPassBeginInfo.renderArea.extent.width = WIDTH;
@@ -1074,7 +954,7 @@ void VkApp::buiilLCommandBuffer()
 	renderPassBeginInfo.clearValueCount = 2;
 	renderPassBeginInfo.pClearValues = clearValues;
 
-	renderPassBeginInfo.framebuffer = mLFrameBuffer.framebuffer;
+	renderPassBeginInfo.framebuffer = mSwapChain->mSwapChainRenderDatas[swapChianIndex].mFrameBufferData.mFramebuffer;
 
 	VK_CHECK_RESULT(vkBeginCommandBuffer(LCommandBuffer, &cmdBufInfo))
 	vkCmdBeginRenderPass(LCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -1083,9 +963,9 @@ void VkApp::buiilLCommandBuffer()
 	VkRect2D scissor = initializers::rect2D(WIDTH, HEIGHT, 0, 0);
 	vkCmdSetScissor(LCommandBuffer, 0, 1, &scissor);
 
-	vkCmdBindDescriptorSets(LCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LPipelineLayout, 0, 1, &LightingDescriptorSet, 0, nullptr);
+	vkCmdBindDescriptorSets(LCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mSwapChain->mSwapChainRenderDatas[swapChianIndex].mPipelineData.mPipelineLayout, 0, 1, &LightingDescriptorSet, 0, nullptr);
 
-	vkCmdBindPipeline(LCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LPipeline);
+	vkCmdBindPipeline(LCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mSwapChain->mSwapChainRenderDatas[swapChianIndex].mPipelineData.mPipeline);
 
 	vkCmdDraw(LCommandBuffer, 3, 1, 0, 0);
 
@@ -1115,6 +995,10 @@ void VkApp::drawFrame()
 
 	uint32_t imageindex;
 	VkResult result = vkAcquireNextImageKHR(vulkanDevice->logicalDevice, mSwapChain->mSwapChain, UINT64_MAX, presentComplete, VK_NULL_HANDLE, &imageindex);
+
+
+	buildGCommandBuffer();
+	buildLightCommandBuffer(imageindex);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
 	{
@@ -1155,6 +1039,7 @@ void VkApp::drawFrame()
 	lightSubmitInfo.pCommandBuffers = &LCommandBuffer;
 	lightSubmitInfo.pWaitDstStageMask = waitStages;
 	VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &lightSubmitInfo, inFlightFence))
+
 	//
 
 	VkPresentInfoKHR presentInfo{};
