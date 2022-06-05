@@ -1,7 +1,7 @@
-#include "VkApp.h"
+#include "Application.h"
 int main()
 {
-	VkApp app;
+	HelloTriangleApplication app;
 
 	try
 	{

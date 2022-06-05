@@ -2,8 +2,7 @@
 #include <vulkan/vulkan.hpp>
 #include "FrameBuffer.h"
 
-class VkApp;
-class Shader;
+class HelloTriangleApplication;
 
 struct SwapChainSupportDetails
 {
@@ -26,6 +25,9 @@ struct SwapChainPipeline
 {
 	VkPipeline mPipeline;
 	VkPipelineLayout mPipelineLayout;
+
+	VkShaderModule mVertexShaderModule;
+	VkShaderModule mFragmentShaderModule;
 };
 
 struct SwapChainRenderData
@@ -46,17 +48,14 @@ public:
 	VkSurfaceFormatKHR mSwapChainFormat;
 	VkRenderPass mSwapChainRenderPass;
 	uint32_t mImageCount = 0;
-
-	Shader* mLightVertShader;
-	Shader* mLightFragShader;
 	
 	std::vector<SwapChainRenderData> mSwapChainRenderDatas;
 
 private:
-	VkApp* mApp = nullptr;
+	HelloTriangleApplication* mApp = nullptr;
 
 public:
-	SwapChain(VkApp* vkApp);
+	SwapChain(HelloTriangleApplication* vkApp);
 	void CleanUp();
 public:
 	void CreateSwapChain();
@@ -64,14 +63,12 @@ public:
 	SwapChainFrameBuffer GetFrameBuffer(uint32_t availableIndex);
 
 private:
-	void CreateSwapChainShader();
 	void CacheSwapChainImage();
 	void CreateSwapChainImageView();
 	void CreateSwapChainRenderPass();
 	void CreateSwapChainFrameBuffer();
 	void CreateSwapChainPipeline();
 	void CreateSwapChainPipelineLayout();
-	
 
 	VkSurfaceFormatKHR PickSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 	VkPresentModeKHR PickPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
