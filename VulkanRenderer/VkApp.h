@@ -66,14 +66,6 @@ struct GFrameBuffer
 	VkRenderPass renderPass;
 };
 
-struct LFrameBuffer
-{
-	int32_t width, height;
-	VkFramebuffer framebuffer;
-	FrameBufferAttachment composition;
-	VkRenderPass renderPass;
-};
-
 class VkApp
 {
 	friend class SwapChain;
@@ -178,9 +170,6 @@ private:
 
 	Shader* mGVertShader;
 	Shader* mGFragShader;
-
-	Shader* mLVertShader;
-	Shader* mLFragShader;
 	
 	GLFWwindow* window = nullptr;
 
@@ -211,14 +200,11 @@ private:
 	Buffer lightUBO;
 
 	GFrameBuffer mGFrameBuffer;
-	LFrameBuffer mLFrameBuffer;
 
 	VkPipeline GBufferPipeline;
-	VkPipeline LBufferPipeline;
 
 	VkPipelineLayout GPipelineLayout;
-	VkPipelineLayout LPipelineLayout;
-	
+
 	VkDescriptorSetLayout GDescriptorSetLayout;
 	VkDescriptorSetLayout LightDescriptorSetLayout;
 
@@ -230,7 +216,7 @@ private:
 	VkDebugUtilsMessengerEXT debugMessenger;
 
 	VkCommandBuffer GCommandBuffer;
-	VkCommandBuffer LCommandBuffer;
+	VkCommandBuffer LightingCommandBuffer;
 
 	//Synchronize
 	VkSemaphore GBufferComplete;

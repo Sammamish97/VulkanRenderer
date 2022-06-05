@@ -8,13 +8,14 @@
 SwapChain::SwapChain(VkApp* vkApp)
 	:mApp(vkApp)
 {
+	CreateSwapChainShader();
 	CreateSwapChain();
 	CacheSwapChainImage();
 	CreateSwapChainImageView();
 	CreateSwapChainRenderPass();
 	CreateSwapChainFrameBuffer();
-	//CreateSwapChainPipelineLayout();
-	//CreateSwapChainPipeline();
+	CreateSwapChainPipelineLayout();
+	CreateSwapChainPipeline();
 }
 
 void SwapChain::CreateSwapChain()
@@ -53,6 +54,12 @@ void SwapChain::CreateSwapChain()
 	createInfo.oldSwapchain = VK_NULL_HANDLE;
 
 	VK_CHECK_RESULT(vkCreateSwapchainKHR(mApp->vulkanDevice->logicalDevice, &createInfo, nullptr, &mSwapChain))
+}
+
+void SwapChain::CreateSwapChainShader()
+{
+	mLightVertShader = new Shader("../shaders/LightingVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mApp->vulkanDevice->logicalDevice);
+	mLightFragShader = new Shader("../shaders/LightingFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mApp->vulkanDevice->logicalDevice);
 }
 
 void SwapChain::CacheSwapChainImage()
@@ -280,8 +287,8 @@ void SwapChain::CreateSwapChainPipeline()
 		pipelineCI.pStages = shaderStages.data();
 
 		rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
-		shaderStages[0] = mSwapChainVertexShader->GetShaderStageCreateInfo(mApp->vulkanDevice->logicalDevice);
-		shaderStages[1] = mSwapChainFragShader->GetShaderStageCreateInfo(mApp->vulkanDevice->logicalDevice);
+		shaderStages[0] = mLightVertShader->GetShaderStageCreateInfo(mApp->vulkanDevice->logicalDevice);
+		shaderStages[1] = mLightFragShader->GetShaderStageCreateInfo(mApp->vulkanDevice->logicalDevice);
 
 		VkPipelineVertexInputStateCreateInfo emptyInput = initializers::pipelineVertexInputStateCreateInfo();
 		pipelineCI.pVertexInputState = &emptyInput;
