@@ -15,7 +15,7 @@ struct VulkanDevice
 	VkPhysicalDeviceMemoryProperties memoryProperties;
 	std::vector<VkQueueFamilyProperties> queueFamilyProperties;
 	std::vector<std::string> supportedExtensions;
-	VkCommandPool commandPool = VK_NULL_HANDLE;
+	VkCommandPool mCommandPool = VK_NULL_HANDLE;
 	bool enableDebugMarkers = false;
 
 	struct 

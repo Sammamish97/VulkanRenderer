@@ -19,6 +19,11 @@ void VkApp::InitWindow()
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	mWindow = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+
+	if (glfwVulkanSupported() == false)
+	{
+		printf("GLFW: Vulkan Not Supported");
+	}
 }
 
 void VkApp::InitVulkan()
@@ -66,10 +71,8 @@ void VkApp::CreateInstance()
 	VkApplicationInfo appInfo{};
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	appInfo.pApplicationName = "Hello Triangle";
-	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 	appInfo.pEngineName = "No Engine";
-	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.apiVersion = VK_API_VERSION_1_0;
+	appInfo.apiVersion = VK_MAKE_VERSION(1, 3, 0);
 
 	VkInstanceCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -373,6 +376,33 @@ void VkApp::PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT&
 		| VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 
 	createInfo.pfnUserCallback = DebugCallback;
+}
+
+VkCommandBuffer VkApp::CreateTempCmdBuf()
+{
+	VkCommandBufferAllocateInfo allocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+	allocateInfo.commandBufferCount = 1;
+	allocateInfo.commandPool = mVulkanDevice->mCommandPool;
+	allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	VkCommandBuffer cmdBuffer;
+	vkAllocateCommandBuffers(mVulkanDevice->logicalDevice, &allocateInfo, &cmdBuffer);
+
+	VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	vkBeginCommandBuffer(cmdBuffer, &beginInfo);
+	return cmdBuffer;
+}
+
+void VkApp::SubmitTempCmdBuf(VkCommandBuffer cmdBuffer)
+{
+	vkEndCommandBuffer(cmdBuffer);
+
+	VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &cmdBuffer;
+	vkQueueSubmit(mGraphicsQueue, 1, &submitInfo, {});
+	vkQueueWaitIdle(mGraphicsQueue);
+	vkFreeCommandBuffers(mVulkanDevice->logicalDevice, mVulkanDevice->mCommandPool, 1, &cmdBuffer);
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VkApp::DebugCallback(

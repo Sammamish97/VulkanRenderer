@@ -60,6 +60,9 @@ protected:
 	VkFormat FindDepthFormat();
 	VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
+	VkCommandBuffer CreateTempCmdBuf();
+	void SubmitTempCmdBuf(VkCommandBuffer cmdBuffer);
+
 private:
 	void SetupDebugMessenger();
 	bool CheckValidationLayerSupport();
@@ -92,4 +95,3 @@ protected:
 
 	VkDebugUtilsMessengerEXT debugMessenger;
 };
-

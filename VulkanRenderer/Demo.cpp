@@ -1,6 +1,9 @@
 #include "Demo.h"
 #include "VulkanTools.h"
 #include "VulkanInitializers.hpp"
+#include "imgui.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_vulkan.h"
 
 void Demo::run()
 {
@@ -600,7 +603,7 @@ void Demo::CreateCommandBuffers()
 {
 	VkCommandBufferAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = mVulkanDevice->commandPool;
+	allocInfo.commandPool = mVulkanDevice->mCommandPool;
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount = 1;
 
@@ -744,4 +747,102 @@ void Demo::ProcessInput()
 		camera->ProcessKeyboard(UP, deltaTime);
 	if (glfwGetKey(mWindow, GLFW_KEY_E) == GLFW_PRESS)
 		camera->ProcessKeyboard(DOWN, deltaTime);
+}
+
+void Demo::CreatePostRenderPass()
+{
+	std::array<VkAttachmentDescription, 2> attachments{};
+	// Color attachment
+	attachments[0].format = VK_FORMAT_B8G8R8A8_UNORM;
+	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+
+	// Depth attachment
+	attachments[1].format = VK_FORMAT_X8_D24_UNORM_PACK32;
+	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+
+	const VkAttachmentReference colorReference{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	const VkAttachmentReference depthReference{ 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+
+
+	std::array<VkSubpassDependency, 1> subpassDependencies{};
+	// Transition from final to initial (VK_SUBPASS_EXTERNAL refers to all commands executed outside of the actual renderpass)
+	subpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	subpassDependencies[0].dstSubpass = 0;
+	subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	subpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	subpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
+		| VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	subpassDependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	VkSubpassDescription subpassDescription{};
+	subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpassDescription.colorAttachmentCount = 1;
+	subpassDescription.pColorAttachments = &colorReference;
+	subpassDescription.pDepthStencilAttachment = &depthReference;
+
+	VkRenderPassCreateInfo renderPassInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+	renderPassInfo.pAttachments = attachments.data();
+	renderPassInfo.subpassCount = 1;
+	renderPassInfo.pSubpasses = &subpassDescription;
+	renderPassInfo.dependencyCount = static_cast<uint32_t>(subpassDependencies.size());
+	renderPassInfo.pDependencies = subpassDependencies.data();
+
+	vkCreateRenderPass(mVulkanDevice->logicalDevice, &renderPassInfo, nullptr, &mPostRenderPass);
+	// To destroy: vkDestroyRenderPass(m_device, m_postRenderPass, nullptr);
+}
+
+void Demo::InitGUI()
+{
+	CreatePostRenderPass();
+	uint32_t subpassID = 0;
+
+	// UI
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO();
+	io.LogFilename = nullptr;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+
+	std::vector<VkDescriptorPoolSize> poolSize{ {VK_DESCRIPTOR_TYPE_SAMPLER, 1}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1} };
+	VkDescriptorPoolCreateInfo        poolInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+	poolInfo.maxSets = 2;
+	poolInfo.poolSizeCount = 2;
+	poolInfo.pPoolSizes = poolSize.data();
+	vkCreateDescriptorPool(mVulkanDevice->logicalDevice, &poolInfo, nullptr, &mImguiDescPool);
+
+	// Setup Platform/Renderer back ends
+	ImGui_ImplVulkan_InitInfo init_info = {};
+	init_info.Instance = mInstance;
+	init_info.PhysicalDevice = mVulkanDevice->physicalDevice;
+	init_info.Device = mVulkanDevice->logicalDevice;
+	init_info.QueueFamily = mVulkanDevice->getQueueFamilyIndex(VK_QUEUE_GRAPHICS_BIT);
+	init_info.Queue = mGraphicsQueue;
+	init_info.PipelineCache = VK_NULL_HANDLE;
+	init_info.DescriptorPool = mImguiDescPool;
+	init_info.Subpass = subpassID;
+	init_info.MinImageCount = 2;
+	init_info.ImageCount = mSwapChain->mImageCount;
+	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+	init_info.CheckVkResultFn = nullptr;
+	init_info.Allocator = nullptr;
+
+	ImGui_ImplVulkan_Init(&init_info, mPostRenderPass);
+
+	// Upload Fonts
+	VkCommandBuffer cmdbuf = CreateTempCmdBuf();
+	ImGui_ImplVulkan_CreateFontsTexture(cmdbuf);
+	SubmitTempCmdBuf(cmdbuf);
+
+	ImGui_ImplGlfw_InitForVulkan(mWindow, true);
+}
+
+void Demo::DrawGUI()
+{
+
 }

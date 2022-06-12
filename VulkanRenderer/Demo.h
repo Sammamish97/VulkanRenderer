@@ -26,6 +26,7 @@ class Demo : public VkApp
 {
 public:
 	void run();
+
 private:
 	void Init() override;
 	void Update() override;
@@ -57,6 +58,13 @@ private:
 	void BuildGCommandBuffer();
 
 	void UpdateUniformBuffer(uint32_t currentImage);
+
+private:
+	VkDescriptorPool mImguiDescPool{ VK_NULL_HANDLE };
+	VkRenderPass mPostRenderPass;
+	void CreatePostRenderPass();
+	void InitGUI();
+	void DrawGUI();
 
 private:
 	void ProcessInput();

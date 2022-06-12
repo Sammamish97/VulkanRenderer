@@ -36,9 +36,9 @@ VulkanDevice::VulkanDevice(VkPhysicalDevice physicalDevice)
 
 VulkanDevice::~VulkanDevice()
 {
-	if(commandPool)
+	if(mCommandPool)
 	{
-		vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
+		vkDestroyCommandPool(logicalDevice, mCommandPool, nullptr);
 	}
 	if(logicalDevice)
 	{
@@ -237,7 +237,7 @@ VkResult VulkanDevice::createLogicalDevice(VkPhysicalDeviceFeatures enabledFeatu
 		return result;
 	}
 
-	commandPool = createCommandPool(queueFamilyIndices.graphics);
+	mCommandPool = createCommandPool(queueFamilyIndices.graphics);
 	return result;
 }
 
@@ -401,7 +401,7 @@ VkCommandBuffer VulkanDevice::createCommandBuffer(VkCommandBufferLevel level, Vk
 
 VkCommandBuffer VulkanDevice::createCommandBuffer(VkCommandBufferLevel level, bool begin)
 {
-	return createCommandBuffer(level, commandPool, begin);
+	return createCommandBuffer(level, mCommandPool, begin);
 }
 
 void VulkanDevice::flushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, VkCommandPool pool, bool free)
@@ -435,7 +435,7 @@ void VulkanDevice::flushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue que
 
 void VulkanDevice::flushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, bool free)
 {
-	return flushCommandBuffer(commandBuffer, queue, commandPool, free);
+	return flushCommandBuffer(commandBuffer, queue, mCommandPool, free);
 }
 
 bool VulkanDevice::extensionSupported(std::string extension)
