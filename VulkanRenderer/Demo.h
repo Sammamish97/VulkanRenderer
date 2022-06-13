@@ -61,8 +61,7 @@ private:
 
 private:
 	VkDescriptorPool mImguiDescPool{ VK_NULL_HANDLE };
-	VkRenderPass mPostRenderPass;
-	void CreatePostRenderPass();
+
 	void InitGUI();
 	void DrawGUI();
 

@@ -60,22 +60,25 @@
     <ClCompile Include="Demo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\CS399\libs\imgui-master\imgui.cpp">
+    <ClCompile Include="..\Include\imgui-master\imgui.cpp">
       <Filter>IMGUI</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\CS399\libs\imgui-master\imgui_draw.cpp">
+    <ClCompile Include="..\Include\imgui-master\imgui_draw.cpp">
       <Filter>IMGUI</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\CS399\libs\imgui-master\imgui_widgets.cpp">
+    <ClCompile Include="..\Include\imgui-master\imgui_widgets.cpp">
       <Filter>IMGUI</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\CS399\libs\imgui-master\backends\imgui_impl_glfw.cpp">
+    <ClCompile Include="..\Include\imgui-master\backends\imgui_impl_glfw.cpp">
       <Filter>IMGUI</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\CS399\libs\imgui-master\backends\imgui_impl_vulkan.cpp">
+    <ClCompile Include="..\Include\imgui-master\backends\imgui_impl_vulkan.cpp">
       <Filter>IMGUI</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\CS399\libs\imgui-master\imgui_demo.cpp">
+    <ClCompile Include="..\Include\imgui-master\imgui_demo.cpp">
+      <Filter>IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Include\imgui-master\imgui_tables.cpp">
       <Filter>IMGUI</Filter>
     </ClCompile>
   </ItemGroup>

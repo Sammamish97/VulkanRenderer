@@ -1,9 +1,11 @@
 #include "Demo.h"
+
+#include <imgui.h>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_vulkan.h>
+
 #include "VulkanTools.h"
 #include "VulkanInitializers.hpp"
-#include "imgui.h"
-#include "backends/imgui_impl_glfw.h"
-#include "backends/imgui_impl_vulkan.h"
 
 void Demo::run()
 {
@@ -34,6 +36,8 @@ void Demo::Init()
 
 	CreateGraphicsPipelines();
 	CreateCommandBuffers();
+
+	InitGUI();
 }
 
 void Demo::Update()
@@ -41,7 +45,9 @@ void Demo::Update()
 	while (glfwWindowShouldClose(mWindow) == false)
 	{
 		FrameStart();
-
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+		DrawGUI();
 		VkApp::Update();
 		ProcessInput();
 
@@ -650,6 +656,9 @@ void Demo::BuildLightCommandBuffer(int swapChianIndex)
 
 	vkCmdDraw(LightingCommandBuffer, 3, 1, 0, 0);
 
+	ImGui::Render();
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), LightingCommandBuffer);
+
 	vkCmdEndRenderPass(LightingCommandBuffer);
 
 	VK_CHECK_RESULT(vkEndCommandBuffer(LightingCommandBuffer));
@@ -749,58 +758,8 @@ void Demo::ProcessInput()
 		camera->ProcessKeyboard(DOWN, deltaTime);
 }
 
-void Demo::CreatePostRenderPass()
-{
-	std::array<VkAttachmentDescription, 2> attachments{};
-	// Color attachment
-	attachments[0].format = VK_FORMAT_B8G8R8A8_UNORM;
-	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-	attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-
-	// Depth attachment
-	attachments[1].format = VK_FORMAT_X8_D24_UNORM_PACK32;
-	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-	attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-
-	const VkAttachmentReference colorReference{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-	const VkAttachmentReference depthReference{ 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
-
-
-	std::array<VkSubpassDependency, 1> subpassDependencies{};
-	// Transition from final to initial (VK_SUBPASS_EXTERNAL refers to all commands executed outside of the actual renderpass)
-	subpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-	subpassDependencies[0].dstSubpass = 0;
-	subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	subpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-	subpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
-		| VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	subpassDependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-	VkSubpassDescription subpassDescription{};
-	subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpassDescription.colorAttachmentCount = 1;
-	subpassDescription.pColorAttachments = &colorReference;
-	subpassDescription.pDepthStencilAttachment = &depthReference;
-
-	VkRenderPassCreateInfo renderPassInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
-	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-	renderPassInfo.pAttachments = attachments.data();
-	renderPassInfo.subpassCount = 1;
-	renderPassInfo.pSubpasses = &subpassDescription;
-	renderPassInfo.dependencyCount = static_cast<uint32_t>(subpassDependencies.size());
-	renderPassInfo.pDependencies = subpassDependencies.data();
-
-	vkCreateRenderPass(mVulkanDevice->logicalDevice, &renderPassInfo, nullptr, &mPostRenderPass);
-	// To destroy: vkDestroyRenderPass(m_device, m_postRenderPass, nullptr);
-}
-
 void Demo::InitGUI()
 {
-	CreatePostRenderPass();
 	uint32_t subpassID = 0;
 
 	// UI
@@ -832,7 +791,7 @@ void Demo::InitGUI()
 	init_info.CheckVkResultFn = nullptr;
 	init_info.Allocator = nullptr;
 
-	ImGui_ImplVulkan_Init(&init_info, mPostRenderPass);
+	ImGui_ImplVulkan_Init(&init_info, mSwapChain->mSwapChainRenderPass);
 
 	// Upload Fonts
 	VkCommandBuffer cmdbuf = CreateTempCmdBuf();
@@ -844,5 +803,6 @@ void Demo::InitGUI()
 
 void Demo::DrawGUI()
 {
-
+	ImGui::Text("Rate %.3f ms/frame (%.1f FPS)",
+		1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 }
