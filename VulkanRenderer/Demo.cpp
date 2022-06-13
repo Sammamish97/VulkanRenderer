@@ -27,6 +27,12 @@ void Demo::Init()
 	CreateGRenderPass();
 	CreateGFramebuffer();
 
+	CreateLRenderPass();
+	CreateLFramebuffer();
+
+	CreatePostRenderPass();
+	CreatePostFrameBuffer();
+
 	CreateUniformBuffers();
 
 	CreateDescriptorPool();
@@ -69,7 +75,8 @@ void Demo::Draw()
 
 
 	BuildGCommandBuffer();
-	BuildLightCommandBuffer(imageindex);
+	BuildLightCommandBuffer();
+	BuildPostCommandBuffer(0);//TODO: Can transfer to Init. Not draw.
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
 	{
@@ -111,9 +118,7 @@ void Demo::Draw()
 	lightSubmitInfo.pWaitDstStageMask = waitStages;
 	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &lightSubmitInfo, inFlightFence))
 
-		//
-
-		VkPresentInfoKHR presentInfo {};
+	VkPresentInfoKHR presentInfo {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
 	presentInfo.waitSemaphoreCount = 1;
@@ -172,7 +177,6 @@ void Demo::MouseCallBack(GLFWwindow* window, double xposIn, double yposIn)
 
 	app->camera->ProcessMouseMovement(xoffset, yoffset);
 }
-
 
 void Demo::LoadMeshAndObjects()
 {
@@ -312,6 +316,150 @@ void Demo::CreateGRenderPass()
 	renderPassInfo.pDependencies = dependencies.data();
 	VK_CHECK_RESULT(vkCreateRenderPass(mVulkanDevice->logicalDevice, &renderPassInfo, nullptr, &mGFrameBuffer.renderPass));
 }
+void Demo::CreateLRenderPass()
+{
+	//Create Render Pass for GBuffer
+	mLFrameBuffer.width = FB_DIM;
+	mLFrameBuffer.height = FB_DIM;
+
+	// (World space) Positions
+	CreateAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &mLFrameBuffer.composition);
+
+	VkAttachmentDescription compositionDesc = {};
+	compositionDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	compositionDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	compositionDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	compositionDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	compositionDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+	compositionDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	compositionDesc.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	compositionDesc.format = mLFrameBuffer.composition.format;
+
+	VkAttachmentReference compositionReference = {};
+	compositionReference.attachment = 0;
+	compositionReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.pColorAttachments = &compositionReference;
+	subpass.colorAttachmentCount = 1;
+	subpass.pDepthStencilAttachment = VK_NULL_HANDLE;
+
+	// Use subpass dependencies for attachment layout transitions
+	// src: Before render
+	// dst: After render
+	std::array<VkSubpassDependency, 2> dependencies;
+
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[0].dstSubpass = 0;
+
+	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;//TODO: What's meaning for?
+	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;//먼저 color attachment로 붙여 MTR를 할수 있게 한다.
+
+	dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+
+	dependencies[1].srcSubpass = 0;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+
+	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
+	dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;//Write한 color attachment를 read해서 다음 lighting shader에 넣는다.
+
+	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	VkRenderPassCreateInfo renderPassInfo = {};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassInfo.pAttachments = &compositionDesc;
+	renderPassInfo.attachmentCount = 1;
+	renderPassInfo.subpassCount = 1;
+	renderPassInfo.pSubpasses = &subpass;
+	renderPassInfo.dependencyCount = 2;
+	renderPassInfo.pDependencies = dependencies.data();
+	VK_CHECK_RESULT(vkCreateRenderPass(mVulkanDevice->logicalDevice, &renderPassInfo, nullptr, &mLFrameBuffer.renderPass));
+}
+void Demo::CreatePostRenderPass()
+{
+	//Post processing은 1개의 Depth/ 1개의 color attachment를 사용한다.
+	//일단은 Color는 L의 attachment를, Depth는 G의 attachment를 그대로 사용해보자.
+	//Create Render Pass for GBuffer
+	//Create Render Pass for GBuffer
+	mPFrameBuffer.width = FB_DIM;
+	mPFrameBuffer.height = FB_DIM;
+
+	std::array<VkAttachmentDescription, 2> attachmentDescs = {};
+
+	// Init attachment properties
+	for (uint32_t i = 0; i < 2; ++i)
+	{
+		attachmentDescs[i].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachmentDescs[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		attachmentDescs[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachmentDescs[i].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachmentDescs[i].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		if (i == 1)//Deal with depth buffer
+		{
+			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		}
+		else
+		{
+			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		}
+	}
+
+	attachmentDescs[0].format = mLFrameBuffer.composition.format;
+	attachmentDescs[1].format = mGFrameBuffer.depth.format;
+
+	VkAttachmentReference colorReference = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+
+	VkAttachmentReference depthReference = {};
+	depthReference.attachment = 1;
+	depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.pColorAttachments = &colorReference;
+	subpass.colorAttachmentCount = 1;
+	subpass.pDepthStencilAttachment = &depthReference;
+
+	// Use subpass dependencies for attachment layout transitions
+	std::array<VkSubpassDependency, 2> dependencies;
+
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;//TODO: What's meaning for?
+	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;//먼저 color attachment로 붙여 MTR를 할수 있게 한다.
+	dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	dependencies[1].srcSubpass = 0;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;//Write한 color attachment를 read해서 다음 lighting shader에 넣는다.
+	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	VkRenderPassCreateInfo renderPassInfo = {};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassInfo.pAttachments = attachmentDescs.data();
+	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachmentDescs.size());
+	renderPassInfo.subpassCount = 1;
+	renderPassInfo.pSubpasses = &subpass;
+	renderPassInfo.dependencyCount = 2;
+	renderPassInfo.pDependencies = dependencies.data();
+	VK_CHECK_RESULT(vkCreateRenderPass(mVulkanDevice->logicalDevice, &renderPassInfo, nullptr, &mPFrameBuffer.renderPass));
+}
 
 void Demo::CreateGFramebuffer()
 {
@@ -331,6 +479,38 @@ void Demo::CreateGFramebuffer()
 	fbufCreateInfo.height = mGFrameBuffer.height;
 	fbufCreateInfo.layers = 1;
 	VK_CHECK_RESULT(vkCreateFramebuffer(mVulkanDevice->logicalDevice, &fbufCreateInfo, nullptr, &mGFrameBuffer.framebuffer));
+}
+void Demo::CreateLFramebuffer()
+{
+	VkImageView attachment = mLFrameBuffer.composition.view;
+
+	VkFramebufferCreateInfo fbufCreateInfo = {};
+	fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	fbufCreateInfo.pNext = NULL;
+	fbufCreateInfo.renderPass = mLFrameBuffer.renderPass;
+	fbufCreateInfo.pAttachments = &attachment;
+	fbufCreateInfo.attachmentCount = 1;
+	fbufCreateInfo.width = mLFrameBuffer.width;
+	fbufCreateInfo.height = mLFrameBuffer.height;
+	fbufCreateInfo.layers = 1;
+	VK_CHECK_RESULT(vkCreateFramebuffer(mVulkanDevice->logicalDevice, &fbufCreateInfo, nullptr, &mLFrameBuffer.framebuffer));
+}
+void Demo::CreatePostFrameBuffer()
+{
+	std::array<VkImageView, 2> attachments;
+	attachments[0] = mLFrameBuffer.composition.view;
+	attachments[1] = mGFrameBuffer.depth.view;
+
+	VkFramebufferCreateInfo fbufCreateInfo = {};
+	fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	fbufCreateInfo.pNext = NULL;
+	fbufCreateInfo.renderPass = mPFrameBuffer.renderPass;
+	fbufCreateInfo.pAttachments = attachments.data();
+	fbufCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+	fbufCreateInfo.width = mPFrameBuffer.width;
+	fbufCreateInfo.height = mPFrameBuffer.height;
+	fbufCreateInfo.layers = 1;
+	VK_CHECK_RESULT(vkCreateFramebuffer(mVulkanDevice->logicalDevice, &fbufCreateInfo, nullptr, &mPFrameBuffer.framebuffer));
 }
 
 void Demo::CreateUniformBuffers()
@@ -428,29 +608,36 @@ void Demo::CreateDescriptorSetLayout()
 	albedoTextureBinding.pImmutableSamplers = nullptr;
 
 	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = { lightLayoutBinding, positionTextureBinding, normalTextureBinding, albedoTextureBinding };
-
 	VkDescriptorSetLayoutCreateInfo lightDescriptorLayout = initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mVulkanDevice->logicalDevice, &lightDescriptorLayout, nullptr, &LightDescriptorSetLayout))
 
-		VkPipelineLayoutCreateInfo LightpipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&LightDescriptorSetLayout, 1);
+	VkPipelineLayoutCreateInfo LightpipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&LightDescriptorSetLayout, 1);
 	VK_CHECK_RESULT(vkCreatePipelineLayout(mVulkanDevice->logicalDevice, &LightpipelineLayoutCreateInfo, nullptr, &LightPipelineLayout))
+	//Create Lighting descriptor set layout and pipeilne layout
 
-		//Create Lighting descriptor set layout and pipeilne
-		std::vector<VkDescriptorSetLayoutBinding> GLayoutBinding = { matLayoutBinding };
-
+	std::vector<VkDescriptorSetLayoutBinding> GLayoutBinding = { matLayoutBinding };
 	VkDescriptorSetLayoutCreateInfo GDescriptorLayout = initializers::descriptorSetLayoutCreateInfo(GLayoutBinding);
 
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mVulkanDevice->logicalDevice, &GDescriptorLayout, nullptr, &GDescriptorSetLayout))
-		VkPushConstantRange pushConstant;
+	VkPushConstantRange pushConstant;
 	pushConstant.offset = 0;
 	pushConstant.size = sizeof(glm::mat4);
-	pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT;
 
 	VkPipelineLayoutCreateInfo GpipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&GDescriptorSetLayout, 1);
 	GpipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 	GpipelineLayoutCreateInfo.pPushConstantRanges = &pushConstant;
 
 	VK_CHECK_RESULT(vkCreatePipelineLayout(mVulkanDevice->logicalDevice, &GpipelineLayoutCreateInfo, nullptr, &GPipelineLayout))
+	//Create G path descriptor set layout and pipeline layout
+
+	std::vector<VkDescriptorSetLayoutBinding> PLayoutbindings = { matLayoutBinding };
+	VkDescriptorSetLayoutCreateInfo PDescriptorSetLayoutCI = initializers::descriptorSetLayoutCreateInfo(PLayoutbindings);
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mVulkanDevice->logicalDevice, &PDescriptorSetLayoutCI, nullptr, &PostDescriptorSetLayout))
+
+	VkPipelineLayoutCreateInfo PostPipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&PostDescriptorSetLayout, 1);
+	VK_CHECK_RESULT(vkCreatePipelineLayout(mVulkanDevice->logicalDevice, &PostPipelineLayoutCreateInfo, nullptr, &PostPipelineLayaout))
+	//Create P path descriptor set layout and pipeline layout.
 }
 
 void Demo::CreateDescriptorSet()
@@ -497,16 +684,13 @@ void Demo::CreateDescriptorSet()
 	};
 
 	vkUpdateDescriptorSets(mVulkanDevice->logicalDevice, static_cast<uint32_t>(lightWriteDescriptorSets.size()), lightWriteDescriptorSets.data(), 0, nullptr);
-
-	// G-Buffer description
-
+	// L-Buffer description set
 
 	VkDescriptorSetAllocateInfo GAllocInfo{};
 	GAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	GAllocInfo.descriptorPool = descriptorPool;
 	GAllocInfo.descriptorSetCount = 1;
 	GAllocInfo.pSetLayouts = &GDescriptorSetLayout;
-
 
 	VkDescriptorBufferInfo GBufferInfo{};
 	GBufferInfo.buffer = matUBO.buffer;
@@ -524,6 +708,30 @@ void Demo::CreateDescriptorSet()
 	};
 
 	vkUpdateDescriptorSets(mVulkanDevice->logicalDevice, static_cast<uint32_t>(GBufWriteDescriptorSets.size()), GBufWriteDescriptorSets.data(), 0, nullptr);
+	// G-Buffer description set
+
+	VkDescriptorSetAllocateInfo PAllocInfo{};
+	GAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	GAllocInfo.descriptorPool = descriptorPool;
+	GAllocInfo.descriptorSetCount = 1;
+	GAllocInfo.pSetLayouts = &PostDescriptorSetLayout;
+
+	VkDescriptorBufferInfo PBufferInfo{};
+	PBufferInfo.buffer = matUBO.buffer;
+	PBufferInfo.offset = 0;
+	PBufferInfo.range = sizeof(UniformBufferMat);
+
+	if (vkAllocateDescriptorSets(mVulkanDevice->logicalDevice, &PAllocInfo, &PostDescriptorSet) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to allocate descriptor sets");
+	}
+
+	std::vector<VkWriteDescriptorSet> PBufWriteDescriptorSets;
+	PBufWriteDescriptorSets = {
+		initializers::writeDescriptorSet(PostDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &PBufferInfo)
+	};
+
+	vkUpdateDescriptorSets(mVulkanDevice->logicalDevice, static_cast<uint32_t>(PBufWriteDescriptorSets.size()), PBufWriteDescriptorSets.data(), 0, nullptr);
 }
 
 void Demo::CreateGraphicsPipelines()
@@ -547,8 +755,7 @@ void Demo::CreateGraphicsPipelines()
 		initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
 	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
-	//Need to know swap chain index for get proper swap chain image.
-	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(LightPipelineLayout, mSwapChain->mSwapChainRenderPass);
+	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(LightPipelineLayout, mLFrameBuffer.renderPass);
 	pipelineCI.pInputAssemblyState = &inputAssemblyState;
 	pipelineCI.pRasterizationState = &rasterizationState;
 	pipelineCI.pColorBlendState = &colorBlendState;
@@ -569,7 +776,7 @@ void Demo::CreateGraphicsPipelines()
 		//Finish create lighting graphics pipeline.
 		//Sequently create G buffer graphics pipeline for utilize created pipeline parameters.
 
-		VkPipelineVertexInputStateCreateInfo vertexInputInfo {};
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo {};
 
 	auto bindingDescription = Vertex::getBindingDescription();
 	auto attributeDescriptions = Vertex::getAttributeDescriptions();
@@ -622,9 +829,14 @@ void Demo::CreateCommandBuffers()
 	{
 		throw std::runtime_error("failed to allocate command buffers!");
 	}
+
+	if (vkAllocateCommandBuffers(mVulkanDevice->logicalDevice, &allocInfo, &PostCommandBuffer) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to allocate command buffers!");
+	}
 }
 
-void Demo::BuildLightCommandBuffer(int swapChianIndex)
+void Demo::BuildLightCommandBuffer()
 {
 	VkCommandBufferBeginInfo cmdBufInfo = initializers::commandBufferBeginInfo();
 
@@ -633,7 +845,7 @@ void Demo::BuildLightCommandBuffer(int swapChianIndex)
 	clearValues[1].depthStencil = { 1.f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
-	renderPassBeginInfo.renderPass = mSwapChain->mSwapChainRenderPass;
+	renderPassBeginInfo.renderPass = mLFrameBuffer.renderPass;
 	renderPassBeginInfo.renderArea.offset.x = 0;
 	renderPassBeginInfo.renderArea.offset.y = 0;
 	renderPassBeginInfo.renderArea.extent.width = WIDTH;
@@ -641,7 +853,7 @@ void Demo::BuildLightCommandBuffer(int swapChianIndex)
 	renderPassBeginInfo.clearValueCount = 2;
 	renderPassBeginInfo.pClearValues = clearValues;
 
-	renderPassBeginInfo.framebuffer = mSwapChain->mSwapChainRenderDatas[swapChianIndex].mFrameBufferData.mFramebuffer;
+	renderPassBeginInfo.framebuffer = mLFrameBuffer.framebuffer;
 
 	VK_CHECK_RESULT(vkBeginCommandBuffer(LightingCommandBuffer, &cmdBufInfo))
 		vkCmdBeginRenderPass(LightingCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -710,7 +922,7 @@ void Demo::BuildGCommandBuffer()
 		VkDeviceSize offsets[] = { 0 };
 		vkCmdBindVertexBuffers(GCommandBuffer, 0, 1, vertexBuffers, offsets);
 		glm::mat4 modelMat = object->BuildModelMat();
-		vkCmdPushConstants(GCommandBuffer, GPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMat);
+		vkCmdPushConstants(GCommandBuffer, GPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(glm::mat4), &modelMat);
 		vkCmdDraw(GCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
 	}
 	totalVertices = accumulatingVertices;
@@ -719,6 +931,59 @@ void Demo::BuildGCommandBuffer()
 	vkCmdEndRenderPass(GCommandBuffer);
 
 	VK_CHECK_RESULT(vkEndCommandBuffer(GCommandBuffer));
+}
+
+void Demo::BuildPostCommandBuffer(int swapChianIndex)
+{
+	VkCommandBufferBeginInfo cmdBufInfo = initializers::commandBufferBeginInfo();
+
+	// Clear values for all attachments written in the fragment shader
+	std::array<VkClearValue, 4> clearValues;
+	clearValues[0].color = { { 0.0f, 0.0f, 0.0f, 0.0f } };
+	clearValues[3].depthStencil = { 1.0f, 0 };
+
+	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
+	renderPassBeginInfo.renderPass = mPFrameBuffer.renderPass;
+	renderPassBeginInfo.framebuffer = mPFrameBuffer.framebuffer;
+	renderPassBeginInfo.renderArea.extent.width = mPFrameBuffer.width;
+	renderPassBeginInfo.renderArea.extent.height = mPFrameBuffer.height;
+	renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+	renderPassBeginInfo.pClearValues = clearValues.data();
+
+	VK_CHECK_RESULT(vkBeginCommandBuffer(PostCommandBuffer, &cmdBufInfo))
+
+		vkCmdBeginRenderPass(PostCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+	VkViewport viewport = initializers::viewport((float)mPFrameBuffer.width, (float)mPFrameBuffer.height, 0.0f, 1.0f);
+	vkCmdSetViewport(PostCommandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor = initializers::rect2D(mPFrameBuffer.width, mPFrameBuffer.height, 0, 0);
+	vkCmdSetScissor(PostCommandBuffer, 0, 1, &scissor);
+
+	vkCmdBindPipeline(PostCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PostPipeline);
+
+	vkCmdBindDescriptorSets(PostCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PostPipelineLayaout, 0, 1, &PostDescriptorSet, 0, nullptr);
+
+	int accumulatingVertices = 0;
+	int accumulatingFaces = 0;
+	for (Object* object : objects)
+	{
+		accumulatingVertices += object->mMesh->vertexNum;
+		accumulatingFaces += object->mMesh->faceNum;
+
+		VkBuffer vertexBuffers[] = { object->mMesh->vertexBuffer };
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(PostCommandBuffer, 0, 1, vertexBuffers, offsets);
+		glm::mat4 modelMat = object->BuildModelMat();
+		vkCmdPushConstants(PostCommandBuffer, PostPipelineLayaout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(glm::mat4), &modelMat);
+		vkCmdDraw(PostCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
+	}
+	totalVertices = accumulatingVertices;
+	totalFaces = accumulatingFaces;
+
+	vkCmdEndRenderPass(PostCommandBuffer);
+
+	VK_CHECK_RESULT(vkEndCommandBuffer(PostCommandBuffer));
 }
 
 void Demo::UpdateUniformBuffer(uint32_t currentImage)

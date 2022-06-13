@@ -15,6 +15,23 @@ struct GFrameBuffer
 	VkRenderPass renderPass;
 };
 
+struct LFrameBuffer
+{
+	int32_t width, height;
+	VkFramebuffer framebuffer;
+	FrameBufferAttachment composition;
+	VkRenderPass renderPass;
+};
+
+struct PostFrameBuffer
+{
+	int32_t width, height;
+	VkFramebuffer framebuffer;
+	FrameBufferAttachment composition;
+	FrameBufferAttachment depth;
+	VkRenderPass renderPass;
+};
+
 struct MouseInfo
 {
 	float lastX = 540;
@@ -40,13 +57,21 @@ private:
 	void CreateLight();
 	void CreateCamera();
 	void CreateSyncObjects();
-
+//
 	void CreateGRenderPass();
 	void CreateGFramebuffer();
 
+	void CreateLRenderPass();
+	void CreateLFramebuffer();
+
+	void CreatePostRenderPass();
+	void CreatePostFrameBuffer();
+
+	void CreateSampler();
+
 	void CreateUniformBuffers();
 	void CreateDescriptorPool();
-	void CreateSampler();
+	
 	void CreateDescriptorSetLayout();
 	void CreateDescriptorSet();
 
@@ -54,8 +79,9 @@ private:
 
 	void CreateCommandBuffers();
 
-	void BuildLightCommandBuffer(int swapChianIndex);
+	void BuildLightCommandBuffer();
 	void BuildGCommandBuffer();
+	void BuildPostCommandBuffer(int swapChianIndex);
 
 	void UpdateUniformBuffer(uint32_t currentImage);
 
@@ -83,35 +109,38 @@ private:
 
 	Camera* camera;
 	UniformBufferLights lightsData;
+	VkDescriptorPool descriptorPool;
+	VkSampler colorSampler;
 
+//FrameBuffer & Render related
 	Buffer matUBO;
 	Buffer lightUBO;
 
 	GFrameBuffer mGFrameBuffer;
+	LFrameBuffer mLFrameBuffer;
+	PostFrameBuffer mPFrameBuffer;
 
 	VkPipeline GBufferPipeline;
-	VkPipeline GNormalPipeline;
-	VkPipeline GWirePipeline;
-
 	VkPipeline LightingPipeline;
+	VkPipeline PostPipeline;
 
 	VkPipelineLayout GPipelineLayout;
 	VkPipelineLayout LightPipelineLayout;
+	VkPipelineLayout PostPipelineLayaout;
 
 	VkDescriptorSetLayout GDescriptorSetLayout;
 	VkDescriptorSetLayout LightDescriptorSetLayout;
+	VkDescriptorSetLayout PostDescriptorSetLayout;
 
 	VkDescriptorSet GBufferDescriptorSet;
 	VkDescriptorSet LightingDescriptorSet;
-
-	VkDescriptorPool descriptorPool;
-
-	VkSampler colorSampler;
+	VkDescriptorSet PostDescriptorSet;
 
 	VkCommandBuffer GCommandBuffer;
 	VkCommandBuffer LightingCommandBuffer;
+	VkCommandBuffer PostCommandBuffer;
 
-	//Synchronize
+//Synchronize
 	VkSemaphore GBufferComplete;
 	VkSemaphore renderComplete;
 	VkSemaphore presentComplete;
