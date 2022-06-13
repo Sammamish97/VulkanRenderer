@@ -70,6 +70,10 @@ private:
 	static void MouseCallBack(GLFWwindow* window, double xposIn, double yposIn);
 
 private:
+	int totalVertices = 0;
+	int totalFaces = 0;
+
+private:
 	MouseInfo mouseInfo;
 
 	Mesh* redMesh;
@@ -86,6 +90,9 @@ private:
 	GFrameBuffer mGFrameBuffer;
 
 	VkPipeline GBufferPipeline;
+	VkPipeline GNormalPipeline;
+	VkPipeline GWirePipeline;
+
 	VkPipeline LightingPipeline;
 
 	VkPipelineLayout GPipelineLayout;

@@ -699,8 +699,13 @@ void Demo::BuildGCommandBuffer()
 
 	vkCmdBindDescriptorSets(GCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GPipelineLayout, 0, 1, &GBufferDescriptorSet, 0, nullptr);
 
+	int accumulatingVertices = 0;
+	int accumulatingFaces = 0;
 	for (Object* object : objects)
 	{
+		accumulatingVertices += object->mMesh->vertexNum;
+		accumulatingFaces += object->mMesh->faceNum;
+
 		VkBuffer vertexBuffers[] = { object->mMesh->vertexBuffer };
 		VkDeviceSize offsets[] = { 0 };
 		vkCmdBindVertexBuffers(GCommandBuffer, 0, 1, vertexBuffers, offsets);
@@ -708,6 +713,8 @@ void Demo::BuildGCommandBuffer()
 		vkCmdPushConstants(GCommandBuffer, GPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMat);
 		vkCmdDraw(GCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
 	}
+	totalVertices = accumulatingVertices;
+	totalFaces = accumulatingFaces; 
 
 	vkCmdEndRenderPass(GCommandBuffer);
 
@@ -805,4 +812,7 @@ void Demo::DrawGUI()
 {
 	ImGui::Text("Rate %.3f ms/frame (%.1f FPS)",
 		1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+	ImGui::Text("Total Vertices: %d", totalVertices);
+	ImGui::Text("Total Faces: %d", totalFaces);
 }

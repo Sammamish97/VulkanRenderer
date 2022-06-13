@@ -63,6 +63,7 @@ bool Mesh::loadFromObj(const char* filename, glm::vec3 assignedColor)
 	for (size_t s = 0; s < shapes.size(); s++) {
 		// Loop over faces(polygon)
 		size_t index_offset = 0;
+		faceNum += shapes[s].mesh.num_face_vertices.size();
 		for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
 
 			//hardcode loading to triangles
@@ -95,12 +96,13 @@ bool Mesh::loadFromObj(const char* filename, glm::vec3 assignedColor)
 				//we are setting the vertex color as the vertex normal. This is just for display purposes
 				new_vert.color = assignedColor;
 
-
 				vertices.push_back(new_vert);
 			}
 			index_offset += fv;
 		}
 	}
+	vertexNum = faceNum * 3;
+
 	return true;
 }
 

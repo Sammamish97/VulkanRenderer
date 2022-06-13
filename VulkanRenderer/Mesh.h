@@ -29,6 +29,8 @@ public:
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
 
+	int vertexNum = 0;
+	int faceNum = 0;
 private:
 	VkDevice logicalDevice;
 };
