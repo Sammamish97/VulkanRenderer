@@ -59,6 +59,7 @@ void VkApp::FrameEnd()
 {
 	frameEnd = std::chrono::system_clock::now();
 	deltaTime = std::chrono::duration<float>(frameEnd - frameStart).count();
+	accumulatingDT += deltaTime;
 }
 
 /*************************************************************************************************************/

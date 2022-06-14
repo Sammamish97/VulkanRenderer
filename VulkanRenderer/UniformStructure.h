@@ -1,6 +1,6 @@
 #pragma once
 #include <glm/glm.hpp>
-#include "DirLight.h"
+#include "PointLight.h"
 
 struct UniformBufferMat
 {
@@ -10,6 +10,6 @@ struct UniformBufferMat
 
 struct UniformBufferLights
 {
-	DirLight dir_light[3];
+	PointLight point_light[3];
 	glm::vec3 lookVec;
 };

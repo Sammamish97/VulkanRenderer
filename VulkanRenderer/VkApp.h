@@ -89,7 +89,8 @@ protected:
 
 	std::chrono::system_clock::time_point frameStart;
 	std::chrono::system_clock::time_point frameEnd;
-	float deltaTime;
+	float deltaTime = 0.f;
+	float accumulatingDT = 0.f;
 
 	bool framebufferResized = false;
 	uint32_t currentFrame = 0;

@@ -8,17 +8,17 @@ layout (location = 0) in vec2 inUV;
 
 layout (location = 0) out vec4 outFragcolor;
 
-struct DirLight {
+struct PointLight {
 	vec3 color;
     float pad;
-	vec3 dir;
+	vec3 pos;
     float pad2;
 };
 
-layout (binding = 1) uniform DirLightsUBO {
-    DirLight dirlights[3];
+layout (binding = 1) uniform PointLightsUBO {
+    PointLight pointlights[3];
     vec3 lookvec;
-} dirLight;
+} pointLight;
 
 void main() 
 {
@@ -33,9 +33,9 @@ void main()
     
     for(int i = 0; i < 3; ++i)
     {
-        vec3 norm_l = normalize(dirLight.dirlights[i].dir);
-        float diff = max(dot(norm_l, norm_n), 0.2);
-        vec3 diffuse = diff * dirLight.dirlights[i].color;
+        vec3 norm_l = normalize(pointLight.pointlights[i].pos - fragPos);
+        float diff = max(dot(norm_l, norm_n), 0);
+        vec3 diffuse = diff * pointLight.pointlights[i].color;
 
         result += (diffuse) * vec3(albedo);
     }

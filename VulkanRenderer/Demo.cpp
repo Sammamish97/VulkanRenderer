@@ -191,7 +191,8 @@ void Demo::MouseCallBack(GLFWwindow* window, double xposIn, double yposIn)
 	app->mouseInfo.lastX = xpos;
 	app->mouseInfo.lastY = ypos;
 
-	app->camera->ProcessMouseMovement(xoffset, yoffset);
+	if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT))
+		app->camera->ProcessMouseMovement(xoffset, yoffset);
 }
 
 void Demo::LoadMeshAndObjects()
@@ -206,16 +207,16 @@ void Demo::LoadMeshAndObjects()
 	BlueMesh->loadAndCreateMesh("../models/Torus.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
 
-	objects.push_back(new Object(redMesh, glm::vec3(0.f, 3.f, 0.f)));
-	objects.push_back(new Object(greenMesh, glm::vec3(1.5f, 0.f, 0.f)));
-	objects.push_back(new Object(BlueMesh, glm::vec3(-1.5f, 0.f, 0.f)));
+	objects.push_back(new Object(redMesh, glm::vec3(0.f, 0.f, 3.f)));
+	objects.push_back(new Object(greenMesh, glm::vec3(3.f, 0.f, 0.f)));
+	objects.push_back(new Object(BlueMesh, glm::vec3(-3.f, 0.f, 0.f)));
 }
 
 void Demo::CreateLight()
 {
-	lightsData.dir_light[0] = DirLight(glm::vec3(0.1f, 0.5f, 0.1f), glm::vec3(-0.5f, -0.5f, -0.5f));
-	lightsData.dir_light[1] = DirLight(glm::vec3(0.5f, 0.1f, 0.1), glm::vec3(0.5f, 0.5f, 0.5f));
-	lightsData.dir_light[2] = DirLight(glm::vec3(0.1f, 0.1f, 0.5f), glm::vec3(-0.5f, 0.5f, 0.5f));
+	lightsData.point_light[0] = PointLight(glm::vec3(0.1f, 0.5f, 0.1f), glm::vec3(-10.f, -10.f, -10.f));
+	lightsData.point_light[1] = PointLight(glm::vec3(0.5f, 0.1f, 0.1), glm::vec3(10.f, 10.f, 10.f));
+	lightsData.point_light[2] = PointLight(glm::vec3(0.1f, 0.1f, 0.5f), glm::vec3(-10.f, 10.f, 10.f));
 }
 
 void Demo::CreateCamera()
@@ -1036,6 +1037,16 @@ void Demo::UpdateUniformBuffer(uint32_t currentImage)
 	ubo.proj = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 0.1f, 100.f);
 	ubo.proj[1][1] *= -1;
 
+	float radius = 5.f;
+	float rotateAmount = 0.f;
+	if (RotatingLight == true)
+	{
+		rotateAmount = accumulatingDT;
+	}
+	for (int i = 0; i < 3; ++i)
+	{
+		lightsData.point_light[i].mPos = glm::vec3(radius * cos(rotateAmount + glm::radians(120.f * i)), 0.f, radius * sin(rotateAmount + glm::radians(120.f * i)));
+	}
 
 	void* Matdata;
 	vkMapMemory(mVulkanDevice->logicalDevice, matUBO.memory, 0, sizeof(ubo), 0, &Matdata);
@@ -1120,4 +1131,9 @@ void Demo::DrawGUI()
 	ImGui::Text("Total Faces: %d", totalFaces);
 
 	ImGui::Checkbox("Debug Normals", &DrawNormal);
+	ImGui::Checkbox("Rotate Lights", &RotatingLight);
+
+	ImGui::ColorPicker3("Light1", &lightsData.point_light[0].mColor[0]);
+	ImGui::ColorPicker3("Light2", &lightsData.point_light[1].mColor[0]);
+	ImGui::ColorPicker3("Light3", &lightsData.point_light[2].mColor[0]);
 }
