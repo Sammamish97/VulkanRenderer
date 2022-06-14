@@ -143,6 +143,7 @@ private:
 //Synchronize
 	VkSemaphore GBufferComplete;
 	VkSemaphore renderComplete;
+	VkSemaphore PostComplete;
 	VkSemaphore presentComplete;
 	VkFence inFlightFence;
 };

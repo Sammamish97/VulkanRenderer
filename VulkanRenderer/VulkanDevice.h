@@ -9,13 +9,18 @@ struct VulkanDevice
 {
 	VkPhysicalDevice physicalDevice;
 	VkDevice logicalDevice;
+
 	VkPhysicalDeviceProperties properties;
 	VkPhysicalDeviceFeatures features;
 	VkPhysicalDeviceFeatures enabledFeatures;
+
 	VkPhysicalDeviceMemoryProperties memoryProperties;
 	std::vector<VkQueueFamilyProperties> queueFamilyProperties;
 	std::vector<std::string> supportedExtensions;
+
 	VkCommandPool mCommandPool = VK_NULL_HANDLE;
+	VkCommandPool mTransitionCommandPool = VK_NULL_HANDLE;
+
 	bool enableDebugMarkers = false;
 
 	struct 
@@ -35,7 +40,7 @@ struct VulkanDevice
 
 	uint32_t        getMemoryType(uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32* memTypeFound = nullptr) const;
 	uint32_t        getQueueFamilyIndex(VkQueueFlagBits queueFlags) const;
-	VkResult        createLogicalDevice(VkPhysicalDeviceFeatures enabledFeatures, std::vector<const char*> enabledExtensions, void* pNextChain, bool useSwapChain = true, VkQueueFlags requestedQueueTypes = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
+	VkResult        createLogicalDevice(VkPhysicalDeviceFeatures enabledFeatures, std::vector<const char*> enabledExtensions, void* pNextChain, bool useSwapChain = true, VkQueueFlags requestedQueueTypes = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT);
 	VkResult        createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, VkDeviceSize size, VkBuffer* buffer, VkDeviceMemory* memory, void* data = nullptr);
 	VkResult        createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, Buffer* buffer, VkDeviceSize size, void* data = nullptr);
 	void            copyBuffer(Buffer* src, Buffer* dst, VkQueue queue, VkBufferCopy* copyRegion = nullptr);

@@ -199,6 +199,7 @@ void VkApp::CreateDevice()
 
 	VkPhysicalDeviceFeatures deviceFeatures{};
 	deviceFeatures.samplerAnisotropy = VK_TRUE;
+	deviceFeatures.geometryShader = VK_TRUE;
 
 	VkResult res = mVulkanDevice->createLogicalDevice(deviceFeatures, deviceExtensions, nullptr);
 	if (res == VK_FALSE)
@@ -207,6 +208,8 @@ void VkApp::CreateDevice()
 	}
 
 	vkGetDeviceQueue(mVulkanDevice->logicalDevice, mVulkanDevice->getQueueFamilyIndex(VK_QUEUE_GRAPHICS_BIT), 0, &mGraphicsQueue);
+	vkGetDeviceQueue(mVulkanDevice->logicalDevice, mVulkanDevice->getQueueFamilyIndex(VK_QUEUE_TRANSFER_BIT), 0, &mTransferQueue);
+
 	mPresentQueue = mGraphicsQueue;//TODO: PlaceHolder
 }
 
@@ -249,6 +252,7 @@ void VkApp::CreateAttachment(VkFormat format, VkImageUsageFlagBits usage, FrameB
 	image.samples = VK_SAMPLE_COUNT_1_BIT;
 	image.tiling = VK_IMAGE_TILING_OPTIMAL;
 	image.usage = usage | VK_IMAGE_USAGE_SAMPLED_BIT;
+	image.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	VkMemoryAllocateInfo memAlloc{};
 	memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -393,7 +397,22 @@ VkCommandBuffer VkApp::CreateTempCmdBuf()
 	return cmdBuffer;
 }
 
-void VkApp::SubmitTempCmdBuf(VkCommandBuffer cmdBuffer)
+VkCommandBuffer VkApp::CreateTempTransferCmdBuf()
+{
+	VkCommandBufferAllocateInfo allocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+	allocateInfo.commandBufferCount = 1;
+	allocateInfo.commandPool = mVulkanDevice->mTransitionCommandPool;
+	allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	VkCommandBuffer cmdBuffer;
+	vkAllocateCommandBuffers(mVulkanDevice->logicalDevice, &allocateInfo, &cmdBuffer);
+
+	VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	vkBeginCommandBuffer(cmdBuffer, &beginInfo);
+	return cmdBuffer;
+}
+
+void VkApp::SubmitTempCmdBufToGraphicsQueue(VkCommandBuffer cmdBuffer)
 {
 	vkEndCommandBuffer(cmdBuffer);
 
@@ -403,6 +422,72 @@ void VkApp::SubmitTempCmdBuf(VkCommandBuffer cmdBuffer)
 	vkQueueSubmit(mGraphicsQueue, 1, &submitInfo, {});
 	vkQueueWaitIdle(mGraphicsQueue);
 	vkFreeCommandBuffers(mVulkanDevice->logicalDevice, mVulkanDevice->mCommandPool, 1, &cmdBuffer);
+}
+
+void VkApp::SubmitTempCmdBufToTransferQueue(VkCommandBuffer cmdBuffer)
+{
+	vkEndCommandBuffer(cmdBuffer);
+
+	VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &cmdBuffer;
+	vkQueueSubmit(mTransferQueue, 1, &submitInfo, {});
+	vkQueueWaitIdle(mTransferQueue);
+	vkFreeCommandBuffers(mVulkanDevice->logicalDevice, mVulkanDevice->mCommandPool, 1, &cmdBuffer);
+}
+
+
+void VkApp::ImageLayoutTransition(VkImage attachment, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkImageLayout beforeLayout, VkImageLayout afterLayout)
+{
+	VkCommandBuffer tempBuffer = CreateTempCmdBuf();//Not Image!
+	VkImageMemoryBarrier barrier = initializers::imageMemoryBarrier();
+	barrier.srcAccessMask = srcAccessMask;
+	barrier.dstAccessMask = dstAccessMask;
+	barrier.oldLayout = beforeLayout;
+	barrier.newLayout = afterLayout;
+	barrier.image = attachment;
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.layerCount = 1;
+	vkCmdPipelineBarrier(tempBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+	SubmitTempCmdBufToGraphicsQueue(tempBuffer);
+}
+
+void VkApp::CopyImage(VkImage src, VkAccessFlags srcAccessMask, VkImageLayout srcLayout, VkImage dst, VkAccessFlags dstAccessMask, VkImageLayout dstLayout)
+{
+	VkImageCopy copyRegion = {};
+	copyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copyRegion.srcSubresource.baseArrayLayer = 0;
+	copyRegion.srcSubresource.mipLevel = 0;
+	copyRegion.srcSubresource.layerCount = 1;
+	copyRegion.srcOffset = { 0, 0, 0 };
+
+	copyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copyRegion.dstSubresource.baseArrayLayer = 0;
+	copyRegion.dstSubresource.mipLevel = 0;
+	copyRegion.dstSubresource.layerCount = 1;
+	copyRegion.dstOffset = { 0, 0, 0 };
+
+	copyRegion.extent.width = FB_DIM;
+	copyRegion.extent.height = FB_DIM;                             
+	copyRegion.extent.depth = 1;
+	
+	ImageLayoutTransition(src, srcAccessMask, VK_ACCESS_TRANSFER_READ_BIT, srcLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	ImageLayoutTransition(dst, dstAccessMask, VK_ACCESS_TRANSFER_WRITE_BIT, dstLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+	VkCommandBuffer tempBuffer = CreateTempCmdBuf();
+	vkCmdCopyImage(tempBuffer,
+		src,
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		dst,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1,
+		&copyRegion);
+
+	SubmitTempCmdBufToTransferQueue(tempBuffer);
+
+	ImageLayoutTransition(src, VK_ACCESS_TRANSFER_READ_BIT, srcAccessMask, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, srcLayout);
+	ImageLayoutTransition(dst, VK_ACCESS_TRANSFER_WRITE_BIT, dstAccessMask, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, dstLayout);
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VkApp::DebugCallback(

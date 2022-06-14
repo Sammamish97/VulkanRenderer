@@ -142,5 +142,14 @@
     <None Include="..\shaders\Lighting.vert">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="..\shaders\Base.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\shaders\Base.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\shaders\NormalDebug.geom">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

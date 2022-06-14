@@ -107,7 +107,7 @@ void Demo::Draw()
 
 	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &GSubmitInfo, nullptr))
 
-		VkSubmitInfo lightSubmitInfo = {};
+	VkSubmitInfo lightSubmitInfo = {};
 	lightSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	lightSubmitInfo.pWaitSemaphores = &GBufferComplete;
 	lightSubmitInfo.waitSemaphoreCount = 1;
@@ -116,13 +116,27 @@ void Demo::Draw()
 	lightSubmitInfo.commandBufferCount = 1;
 	lightSubmitInfo.pCommandBuffers = &LightingCommandBuffer;
 	lightSubmitInfo.pWaitDstStageMask = waitStages;
-	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &lightSubmitInfo, inFlightFence))
+	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &lightSubmitInfo, nullptr))
+
+	VkSubmitInfo postSubmitInfo = {};
+	postSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	postSubmitInfo.pWaitSemaphores = &renderComplete;
+	postSubmitInfo.waitSemaphoreCount = 1;
+	postSubmitInfo.pSignalSemaphores = &PostComplete;
+	postSubmitInfo.signalSemaphoreCount = 1;
+	postSubmitInfo.commandBufferCount = 1;
+	postSubmitInfo.pCommandBuffers = &PostCommandBuffer;
+	postSubmitInfo.pWaitDstStageMask = waitStages;
+	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &postSubmitInfo, inFlightFence))
+
+	CopyImage(mPFrameBuffer.composition.image, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			mSwapChain->mSwapChainRenderDatas[imageindex].mFrameBufferData.mColorAttachment.image, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 	VkPresentInfoKHR presentInfo {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
 	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores = &renderComplete;
+	presentInfo.pWaitSemaphores = &PostComplete;
 
 	VkSwapchainKHR swapChains[] = { mSwapChain->mSwapChain };
 	presentInfo.swapchainCount = 1;
@@ -219,6 +233,7 @@ void Demo::CreateSyncObjects()
 	if (vkCreateSemaphore(mVulkanDevice->logicalDevice, &semaphoreInfo, nullptr, &GBufferComplete) != VK_SUCCESS ||
 		vkCreateSemaphore(mVulkanDevice->logicalDevice, &semaphoreInfo, nullptr, &renderComplete) != VK_SUCCESS ||
 		vkCreateSemaphore(mVulkanDevice->logicalDevice, &semaphoreInfo, nullptr, &presentComplete) != VK_SUCCESS ||
+		vkCreateSemaphore(mVulkanDevice->logicalDevice, &semaphoreInfo, nullptr, &PostComplete) != VK_SUCCESS ||
 		vkCreateFence(mVulkanDevice->logicalDevice, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to create semaphores!");
@@ -371,7 +386,7 @@ void Demo::CreateLRenderPass()
 	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 
 	dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;//Write한 color attachment를 read해서 다음 lighting shader에 넣는다.
+	dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 
 	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
@@ -400,21 +415,23 @@ void Demo::CreatePostRenderPass()
 	for (uint32_t i = 0; i < 2; ++i)
 	{
 		attachmentDescs[i].samples = VK_SAMPLE_COUNT_1_BIT;
-		attachmentDescs[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		attachmentDescs[i].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		attachmentDescs[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		attachmentDescs[i].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachmentDescs[i].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		attachmentDescs[i].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		if (i == 1)//Deal with depth buffer
 		{
-			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		}
 		else
 		{
-			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		}
 	}
+	mPFrameBuffer.composition = mLFrameBuffer.composition;
+	mPFrameBuffer.depth = mGFrameBuffer.depth;
 
 	attachmentDescs[0].format = mLFrameBuffer.composition.format;
 	attachmentDescs[1].format = mGFrameBuffer.depth.format;
@@ -543,7 +560,7 @@ void Demo::CreateDescriptorPool()
 	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 	poolInfo.pPoolSizes = poolSizes.data();
 
-	poolInfo.maxSets = 2;
+	poolInfo.maxSets = 3;
 
 	if (vkCreateDescriptorPool(mVulkanDevice->logicalDevice, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS)
 	{
@@ -575,7 +592,7 @@ void Demo::CreateDescriptorSetLayout()
 	matLayoutBinding.binding = 0;
 	matLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	matLayoutBinding.descriptorCount = 1;
-	matLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	matLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT;
 	matLayoutBinding.pImmutableSamplers = nullptr;
 
 	//Binding 1: view/projection mat & view vector
@@ -583,7 +600,7 @@ void Demo::CreateDescriptorSetLayout()
 	lightLayoutBinding.binding = 1;
 	lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	lightLayoutBinding.descriptorCount = 1;
-	lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_GEOMETRY_BIT;
 	lightLayoutBinding.pImmutableSamplers = nullptr;
 
 	VkDescriptorSetLayoutBinding positionTextureBinding{};
@@ -636,6 +653,8 @@ void Demo::CreateDescriptorSetLayout()
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mVulkanDevice->logicalDevice, &PDescriptorSetLayoutCI, nullptr, &PostDescriptorSetLayout))
 
 	VkPipelineLayoutCreateInfo PostPipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&PostDescriptorSetLayout, 1);
+	PostPipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+	PostPipelineLayoutCreateInfo.pPushConstantRanges = &pushConstant;
 	VK_CHECK_RESULT(vkCreatePipelineLayout(mVulkanDevice->logicalDevice, &PostPipelineLayoutCreateInfo, nullptr, &PostPipelineLayaout))
 	//Create P path descriptor set layout and pipeline layout.
 }
@@ -692,15 +711,15 @@ void Demo::CreateDescriptorSet()
 	GAllocInfo.descriptorSetCount = 1;
 	GAllocInfo.pSetLayouts = &GDescriptorSetLayout;
 
-	VkDescriptorBufferInfo GBufferInfo{};
-	GBufferInfo.buffer = matUBO.buffer;
-	GBufferInfo.offset = 0;
-	GBufferInfo.range = sizeof(UniformBufferMat);
-
 	if (vkAllocateDescriptorSets(mVulkanDevice->logicalDevice, &GAllocInfo, &GBufferDescriptorSet) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to allocate descriptor sets");
 	}
+
+	VkDescriptorBufferInfo GBufferInfo{};
+	GBufferInfo.buffer = matUBO.buffer;
+	GBufferInfo.offset = 0;
+	GBufferInfo.range = sizeof(UniformBufferMat);
 
 	std::vector<VkWriteDescriptorSet> GBufWriteDescriptorSets;
 	GBufWriteDescriptorSets = {
@@ -710,21 +729,21 @@ void Demo::CreateDescriptorSet()
 	vkUpdateDescriptorSets(mVulkanDevice->logicalDevice, static_cast<uint32_t>(GBufWriteDescriptorSets.size()), GBufWriteDescriptorSets.data(), 0, nullptr);
 	// G-Buffer description set
 
-	VkDescriptorSetAllocateInfo PAllocInfo{};
-	GAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	GAllocInfo.descriptorPool = descriptorPool;
-	GAllocInfo.descriptorSetCount = 1;
-	GAllocInfo.pSetLayouts = &PostDescriptorSetLayout;
-
-	VkDescriptorBufferInfo PBufferInfo{};
-	PBufferInfo.buffer = matUBO.buffer;
-	PBufferInfo.offset = 0;
-	PBufferInfo.range = sizeof(UniformBufferMat);
+	VkDescriptorSetAllocateInfo PAllocInfo = {};
+	PAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	PAllocInfo.descriptorPool = descriptorPool;
+	PAllocInfo.descriptorSetCount = 1;
+	PAllocInfo.pSetLayouts = &PostDescriptorSetLayout;
 
 	if (vkAllocateDescriptorSets(mVulkanDevice->logicalDevice, &PAllocInfo, &PostDescriptorSet) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to allocate descriptor sets");
 	}
+
+	VkDescriptorBufferInfo PBufferInfo{};
+	PBufferInfo.buffer = matUBO.buffer;
+	PBufferInfo.offset = 0;
+	PBufferInfo.range = sizeof(UniformBufferMat);
 
 	std::vector<VkWriteDescriptorSet> PBufWriteDescriptorSets;
 	PBufWriteDescriptorSets = {
@@ -753,6 +772,7 @@ void Demo::CreateGraphicsPipelines()
 	std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 	VkPipelineDynamicStateCreateInfo dynamicState =
 		initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
+
 	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
 
 	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(LightPipelineLayout, mLFrameBuffer.renderPass);
@@ -809,7 +829,25 @@ void Demo::CreateGraphicsPipelines()
 	colorBlendState.pAttachments = blendAttachmentStates.data();
 
 	VK_CHECK_RESULT(vkCreateGraphicsPipelines(mVulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &GBufferPipeline))
-		// Finish create G-graphics pipeline
+	// Finish create G-graphics pipeline
+
+	std::array<VkPipelineShaderStageCreateInfo, 3> geometryShaderStages;
+	geometryShaderStages[0] = createShaderStageCreateInfo("../shaders/BaseVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mVulkanDevice->logicalDevice);
+	geometryShaderStages[1] = createShaderStageCreateInfo("../shaders/NormalDebug.spv", VK_SHADER_STAGE_GEOMETRY_BIT, mVulkanDevice->logicalDevice);
+	geometryShaderStages[2] = createShaderStageCreateInfo("../shaders/BaseFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mVulkanDevice->logicalDevice);
+
+	pipelineCI.stageCount = static_cast<uint32_t>(geometryShaderStages.size());
+	pipelineCI.pStages = geometryShaderStages.data();
+
+	pipelineCI.layout = PostPipelineLayaout;
+	pipelineCI.pVertexInputState = &vertexInputInfo;
+	rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;//TODO: Maybe problem.
+
+	pipelineCI.renderPass = mPFrameBuffer.renderPass;
+
+	//TODO: Maybe blend state is problem.
+	colorBlendState = initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(mVulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &PostPipeline))
 }
 
 void Demo::CreateCommandBuffers()
@@ -848,8 +886,8 @@ void Demo::BuildLightCommandBuffer()
 	renderPassBeginInfo.renderPass = mLFrameBuffer.renderPass;
 	renderPassBeginInfo.renderArea.offset.x = 0;
 	renderPassBeginInfo.renderArea.offset.y = 0;
-	renderPassBeginInfo.renderArea.extent.width = WIDTH;
-	renderPassBeginInfo.renderArea.extent.height = HEIGHT;
+	renderPassBeginInfo.renderArea.extent.width = mLFrameBuffer.width;
+	renderPassBeginInfo.renderArea.extent.height = mLFrameBuffer.height;
 	renderPassBeginInfo.clearValueCount = 2;
 	renderPassBeginInfo.pClearValues = clearValues;
 
@@ -857,9 +895,9 @@ void Demo::BuildLightCommandBuffer()
 
 	VK_CHECK_RESULT(vkBeginCommandBuffer(LightingCommandBuffer, &cmdBufInfo))
 		vkCmdBeginRenderPass(LightingCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-	VkViewport viewport = initializers::viewport((float)WIDTH, (float)HEIGHT, 0.f, 1.f);
+	VkViewport viewport = initializers::viewport((float)mLFrameBuffer.width, (float)mLFrameBuffer.height, 0.f, 1.f);
 	vkCmdSetViewport(LightingCommandBuffer, 0, 1, &viewport);
-	VkRect2D scissor = initializers::rect2D(WIDTH, HEIGHT, 0, 0);
+	VkRect2D scissor = initializers::rect2D(mLFrameBuffer.width, mLFrameBuffer.height, 0, 0);
 	vkCmdSetScissor(LightingCommandBuffer, 0, 1, &scissor);
 
 	vkCmdBindDescriptorSets(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LightPipelineLayout, 0, 1, &LightingDescriptorSet, 0, nullptr);
@@ -938,9 +976,9 @@ void Demo::BuildPostCommandBuffer(int swapChianIndex)
 	VkCommandBufferBeginInfo cmdBufInfo = initializers::commandBufferBeginInfo();
 
 	// Clear values for all attachments written in the fragment shader
-	std::array<VkClearValue, 4> clearValues;
+	std::array<VkClearValue, 2> clearValues;
 	clearValues[0].color = { { 0.0f, 0.0f, 0.0f, 0.0f } };
-	clearValues[3].depthStencil = { 1.0f, 0 };
+	clearValues[1].depthStencil = { 1.0f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
 	renderPassBeginInfo.renderPass = mPFrameBuffer.renderPass;
@@ -952,7 +990,7 @@ void Demo::BuildPostCommandBuffer(int swapChianIndex)
 
 	VK_CHECK_RESULT(vkBeginCommandBuffer(PostCommandBuffer, &cmdBufInfo))
 
-		vkCmdBeginRenderPass(PostCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBeginRenderPass(PostCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 	VkViewport viewport = initializers::viewport((float)mPFrameBuffer.width, (float)mPFrameBuffer.height, 0.0f, 1.0f);
 	vkCmdSetViewport(PostCommandBuffer, 0, 1, &viewport);
@@ -1068,7 +1106,7 @@ void Demo::InitGUI()
 	// Upload Fonts
 	VkCommandBuffer cmdbuf = CreateTempCmdBuf();
 	ImGui_ImplVulkan_CreateFontsTexture(cmdbuf);
-	SubmitTempCmdBuf(cmdbuf);
+	SubmitTempCmdBufToGraphicsQueue(cmdbuf);
 
 	ImGui_ImplGlfw_InitForVulkan(mWindow, true);
 }

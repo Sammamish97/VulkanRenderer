@@ -238,6 +238,7 @@ VkResult VulkanDevice::createLogicalDevice(VkPhysicalDeviceFeatures enabledFeatu
 	}
 
 	mCommandPool = createCommandPool(queueFamilyIndices.graphics);
+	mTransitionCommandPool = createCommandPool(queueFamilyIndices.transfer);
 	return result;
 }
 

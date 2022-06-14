@@ -61,7 +61,12 @@ protected:
 	VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
 	VkCommandBuffer CreateTempCmdBuf();
-	void SubmitTempCmdBuf(VkCommandBuffer cmdBuffer);
+	VkCommandBuffer CreateTempTransferCmdBuf();
+	void SubmitTempCmdBufToGraphicsQueue(VkCommandBuffer cmdBuffer);
+	void SubmitTempCmdBufToTransferQueue(VkCommandBuffer cmdBuffer);//TODO: Use template or overload
+
+	void ImageLayoutTransition(VkImage attachment, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkImageLayout beforeLayout, VkImageLayout afterLayout);
+	void CopyImage(VkImage src, VkAccessFlags srcAccessMask, VkImageLayout srcLayout, VkImage dst, VkAccessFlags dstAccessMask, VkImageLayout dstLayout);
 
 private:
 	void SetupDebugMessenger();
@@ -92,6 +97,7 @@ protected:
 	VkInstance mInstance;
 	VkQueue mGraphicsQueue;
 	VkQueue mPresentQueue;
+	VkQueue mTransferQueue;
 
 	VkDebugUtilsMessengerEXT debugMessenger;
 };

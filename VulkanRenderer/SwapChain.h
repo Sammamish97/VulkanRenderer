@@ -67,8 +67,6 @@ private:
 	void CreateSwapChainImageView();
 	void CreateSwapChainRenderPass();
 	void CreateSwapChainFrameBuffer();
-	void CreateSwapChainPipeline();
-	void CreateSwapChainPipelineLayout();
 
 	VkSurfaceFormatKHR PickSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 	VkPresentModeKHR PickPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
