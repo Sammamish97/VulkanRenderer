@@ -908,7 +908,6 @@ void Demo::BuildLightCommandBuffer()
 	vkCmdBindDescriptorSets(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LightPipelineLayout, 0, 1, &LightingDescriptorSet, 0, nullptr);
 
 	vkCmdBindPipeline(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LightingPipeline);
-
 	vkCmdDraw(LightingCommandBuffer, 3, 1, 0, 0);
 
 	ImGui::Render();
@@ -1019,6 +1018,9 @@ void Demo::BuildPostCommandBuffer(int swapChianIndex)
 			vkCmdDraw(PostCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
 		}
 	}
+
+	ImGui::Render();
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), PostCommandBuffer);
 
 	vkCmdEndRenderPass(PostCommandBuffer);
 
