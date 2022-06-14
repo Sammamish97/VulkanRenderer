@@ -10,6 +10,7 @@ SwapChain::SwapChain(VkApp* vkApp)
 	CreateSwapChain();
 	CacheSwapChainImage();
 	CreateSwapChainImageView();
+	InitSwapChainLayout();
 	CreateSwapChainRenderPass();
 	CreateSwapChainFrameBuffer();
 }
@@ -36,7 +37,7 @@ void SwapChain::CreateSwapChain()
 	createInfo.imageColorSpace = mSwapChainFormat.colorSpace;
 	createInfo.imageExtent = mSwapChainExtent;
 	createInfo.imageArrayLayers = 1;
-	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 	auto queueFamilyIndices = mApp->mVulkanDevice->queueFamilyIndices;
 	createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -68,6 +69,16 @@ void SwapChain::CacheSwapChainImage()
 		mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.image = swapChainImages[i];
 		mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.format = mSwapChainFormat.format;
 	}
+}
+
+void SwapChain::InitSwapChainLayout()
+{
+	for (uint32_t i = 0; i < mImageCount; ++i)
+	{
+		//Need to know access mask
+		mApp->ImageLayoutTransition(mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.image, 0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+	}
+	
 }
 
 VkSwapchainKHR SwapChain::GetSwapChain()
@@ -105,6 +116,8 @@ void SwapChain::CreateSwapChainImageView()
 	}
 }
 
+//!!: Swapchain's framebuffer and renderpass is created, but no need to use because I only need to present image, not render.
+//!!: Rendering process must finished at Post process render pass.
 void SwapChain::CreateSwapChainFrameBuffer()
 {
 	//Image view must created before call this function.
@@ -137,7 +150,7 @@ void SwapChain::CreateSwapChainRenderPass()
 	colorAttachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	colorAttachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	colorAttachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	colorAttachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;//TODO: What if layout changed between the middle of operation?
+	colorAttachmentDesc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;//TODO: What if layout changed between the middle of operation?
 	colorAttachmentDesc.format = mSwapChainFormat.format;
 
 	VkAttachmentReference colorAttachRef = {};

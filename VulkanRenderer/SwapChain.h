@@ -64,6 +64,7 @@ public:
 
 private:
 	void CacheSwapChainImage();
+	void InitSwapChainLayout();
 	void CreateSwapChainImageView();
 	void CreateSwapChainRenderPass();
 	void CreateSwapChainFrameBuffer();

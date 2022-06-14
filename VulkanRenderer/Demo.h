@@ -146,5 +146,9 @@ private:
 	VkSemaphore PostComplete;
 	VkSemaphore presentComplete;
 	VkFence inFlightFence;
+
+//GUI
+	bool DrawNormal = false;
+	bool RotatingLight = false;
 };
 

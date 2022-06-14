@@ -244,8 +244,8 @@ void VkApp::CreateAttachment(VkFormat format, VkImageUsageFlagBits usage, FrameB
 	image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	image.imageType = VK_IMAGE_TYPE_2D;
 	image.format = format;
-	image.extent.width = FB_DIM;
-	image.extent.height = FB_DIM;
+	image.extent.width = WIDTH;
+	image.extent.height = HEIGHT;
 	image.extent.depth = 1;
 	image.mipLevels = 1;
 	image.arrayLayers = 1;
@@ -449,7 +449,7 @@ void VkApp::ImageLayoutTransition(VkImage attachment, VkAccessFlags srcAccessMas
 	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	barrier.subresourceRange.levelCount = 1;
 	barrier.subresourceRange.layerCount = 1;
-	vkCmdPipelineBarrier(tempBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+	vkCmdPipelineBarrier(tempBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 	SubmitTempCmdBufToGraphicsQueue(tempBuffer);
 }
 
@@ -468,8 +468,8 @@ void VkApp::CopyImage(VkImage src, VkAccessFlags srcAccessMask, VkImageLayout sr
 	copyRegion.dstSubresource.layerCount = 1;
 	copyRegion.dstOffset = { 0, 0, 0 };
 
-	copyRegion.extent.width = FB_DIM;
-	copyRegion.extent.height = FB_DIM;                             
+	copyRegion.extent.width = WIDTH;
+	copyRegion.extent.height = HEIGHT;                             
 	copyRegion.extent.depth = 1;
 	
 	ImageLayoutTransition(src, srcAccessMask, VK_ACCESS_TRANSFER_READ_BIT, srcLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -484,7 +484,7 @@ void VkApp::CopyImage(VkImage src, VkAccessFlags srcAccessMask, VkImageLayout sr
 		1,
 		&copyRegion);
 
-	SubmitTempCmdBufToTransferQueue(tempBuffer);
+	SubmitTempCmdBufToGraphicsQueue(tempBuffer);
 
 	ImageLayoutTransition(src, VK_ACCESS_TRANSFER_READ_BIT, srcAccessMask, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, srcLayout);
 	ImageLayoutTransition(dst, VK_ACCESS_TRANSFER_WRITE_BIT, dstAccessMask, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, dstLayout);

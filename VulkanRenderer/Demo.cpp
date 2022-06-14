@@ -75,8 +75,8 @@ void Demo::Draw()
 
 
 	BuildGCommandBuffer();
-	BuildLightCommandBuffer();
-	BuildPostCommandBuffer(0);//TODO: Can transfer to Init. Not draw.
+	BuildLightCommandBuffer();//TODO: Can transfer to Init. Not draw.
+	
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
 	{
@@ -118,6 +118,8 @@ void Demo::Draw()
 	lightSubmitInfo.pWaitDstStageMask = waitStages;
 	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &lightSubmitInfo, nullptr))
 
+	
+	BuildPostCommandBuffer(0);
 	VkSubmitInfo postSubmitInfo = {};
 	postSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	postSubmitInfo.pWaitSemaphores = &renderComplete;
@@ -129,7 +131,7 @@ void Demo::Draw()
 	postSubmitInfo.pWaitDstStageMask = waitStages;
 	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &postSubmitInfo, inFlightFence))
 
-	CopyImage(mPFrameBuffer.composition.image, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	CopyImage(mPFrameBuffer.composition.image, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			mSwapChain->mSwapChainRenderDatas[imageindex].mFrameBufferData.mColorAttachment.image, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 	VkPresentInfoKHR presentInfo {};
@@ -243,8 +245,8 @@ void Demo::CreateSyncObjects()
 void Demo::CreateGRenderPass()
 {
 	//Create Render Pass for GBuffer
-	mGFrameBuffer.width = FB_DIM;
-	mGFrameBuffer.height = FB_DIM;
+	mGFrameBuffer.width = WIDTH;
+	mGFrameBuffer.height = HEIGHT;
 
 	// (World space) Positions
 	CreateAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &mGFrameBuffer.position);
@@ -334,11 +336,13 @@ void Demo::CreateGRenderPass()
 void Demo::CreateLRenderPass()
 {
 	//Create Render Pass for GBuffer
-	mLFrameBuffer.width = FB_DIM;
-	mLFrameBuffer.height = FB_DIM;
+	mLFrameBuffer.width = WIDTH;
+	mLFrameBuffer.height = HEIGHT;
+
+	VkImageUsageFlagBits lightAttachmentUsage = static_cast<VkImageUsageFlagBits>(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
 
 	// (World space) Positions
-	CreateAttachment(VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &mLFrameBuffer.composition);
+	CreateAttachment(VK_FORMAT_B8G8R8A8_SRGB, lightAttachmentUsage, &mLFrameBuffer.composition);
 
 	VkAttachmentDescription compositionDesc = {};
 	compositionDesc.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -406,8 +410,8 @@ void Demo::CreatePostRenderPass()
 	//일단은 Color는 L의 attachment를, Depth는 G의 attachment를 그대로 사용해보자.
 	//Create Render Pass for GBuffer
 	//Create Render Pass for GBuffer
-	mPFrameBuffer.width = FB_DIM;
-	mPFrameBuffer.height = FB_DIM;
+	mPFrameBuffer.width = WIDTH;
+	mPFrameBuffer.height = HEIGHT;
 
 	std::array<VkAttachmentDescription, 2> attachmentDescs = {};
 
@@ -422,12 +426,12 @@ void Demo::CreatePostRenderPass()
 		if (i == 1)//Deal with depth buffer
 		{
 			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		}
 		else
 		{
 			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		}
 	}
 	mPFrameBuffer.composition = mLFrameBuffer.composition;
@@ -1002,22 +1006,18 @@ void Demo::BuildPostCommandBuffer(int swapChianIndex)
 
 	vkCmdBindDescriptorSets(PostCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PostPipelineLayaout, 0, 1, &PostDescriptorSet, 0, nullptr);
 
-	int accumulatingVertices = 0;
-	int accumulatingFaces = 0;
-	for (Object* object : objects)
+	if (DrawNormal == true)
 	{
-		accumulatingVertices += object->mMesh->vertexNum;
-		accumulatingFaces += object->mMesh->faceNum;
-
-		VkBuffer vertexBuffers[] = { object->mMesh->vertexBuffer };
-		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(PostCommandBuffer, 0, 1, vertexBuffers, offsets);
-		glm::mat4 modelMat = object->BuildModelMat();
-		vkCmdPushConstants(PostCommandBuffer, PostPipelineLayaout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(glm::mat4), &modelMat);
-		vkCmdDraw(PostCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
+		for (Object* object : objects)
+		{
+			VkBuffer vertexBuffers[] = { object->mMesh->vertexBuffer };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(PostCommandBuffer, 0, 1, vertexBuffers, offsets);
+			glm::mat4 modelMat = object->BuildModelMat();
+			vkCmdPushConstants(PostCommandBuffer, PostPipelineLayaout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(glm::mat4), &modelMat);
+			vkCmdDraw(PostCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
+		}
 	}
-	totalVertices = accumulatingVertices;
-	totalFaces = accumulatingFaces;
 
 	vkCmdEndRenderPass(PostCommandBuffer);
 
@@ -1118,4 +1118,6 @@ void Demo::DrawGUI()
 
 	ImGui::Text("Total Vertices: %d", totalVertices);
 	ImGui::Text("Total Faces: %d", totalFaces);
+
+	ImGui::Checkbox("Debug Normals", &DrawNormal);
 }
