@@ -65,7 +65,7 @@ protected:
 	void SubmitTempCmdBufToGraphicsQueue(VkCommandBuffer cmdBuffer);
 	void SubmitTempCmdBufToTransferQueue(VkCommandBuffer cmdBuffer);//TODO: Use template or overload
 
-	void ImageLayoutTransition(VkImage attachment, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkImageLayout beforeLayout, VkImageLayout afterLayout);
+	void ImageLayoutTransition(VkImage attachment, VkAccessFlags dstAccessMask, VkImageLayout beforeLayout, VkImageLayout afterLayout);
 	void CopyImage(VkImage src, VkAccessFlags srcAccessMask, VkImageLayout srcLayout, VkImage dst, VkAccessFlags dstAccessMask, VkImageLayout dstLayout);
 
 private:

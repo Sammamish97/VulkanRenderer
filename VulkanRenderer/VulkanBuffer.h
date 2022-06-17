@@ -13,6 +13,8 @@ struct Buffer
 	VkBufferUsageFlags usageFlags;
 	/** @brief Memory property flags to be filled by external source at buffer creation (to query at some later point) */
 	VkMemoryPropertyFlags memoryPropertyFlags;
+
+public:
 	VkResult map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 	void Unmap();
 	VkResult bind(VkDeviceSize offset = 0);

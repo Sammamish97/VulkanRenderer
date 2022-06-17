@@ -438,11 +438,11 @@ void VkApp::SubmitTempCmdBufToTransferQueue(VkCommandBuffer cmdBuffer)
 }
 
 
-void VkApp::ImageLayoutTransition(VkImage attachment, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkImageLayout beforeLayout, VkImageLayout afterLayout)
+void VkApp::ImageLayoutTransition(VkImage attachment, VkAccessFlags dstAccessMask, VkImageLayout beforeLayout, VkImageLayout afterLayout)
 {
 	VkCommandBuffer tempBuffer = CreateTempCmdBuf();//Not Image!
 	VkImageMemoryBarrier barrier = initializers::imageMemoryBarrier();
-	barrier.srcAccessMask = srcAccessMask;
+	barrier.srcAccessMask = 0;
 	barrier.dstAccessMask = dstAccessMask;
 	barrier.oldLayout = beforeLayout;
 	barrier.newLayout = afterLayout;
@@ -450,7 +450,7 @@ void VkApp::ImageLayoutTransition(VkImage attachment, VkAccessFlags srcAccessMas
 	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	barrier.subresourceRange.levelCount = 1;
 	barrier.subresourceRange.layerCount = 1;
-	vkCmdPipelineBarrier(tempBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+	vkCmdPipelineBarrier(tempBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 	SubmitTempCmdBufToGraphicsQueue(tempBuffer);
 }
 
@@ -472,9 +472,9 @@ void VkApp::CopyImage(VkImage src, VkAccessFlags srcAccessMask, VkImageLayout sr
 	copyRegion.extent.width = WIDTH;
 	copyRegion.extent.height = HEIGHT;                             
 	copyRegion.extent.depth = 1;
-	
-	ImageLayoutTransition(src, srcAccessMask, VK_ACCESS_TRANSFER_READ_BIT, srcLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	ImageLayoutTransition(dst, dstAccessMask, VK_ACCESS_TRANSFER_WRITE_BIT, dstLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+	ImageLayoutTransition(src, VK_ACCESS_TRANSFER_READ_BIT, srcLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	ImageLayoutTransition(dst, VK_ACCESS_TRANSFER_WRITE_BIT, dstLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 	VkCommandBuffer tempBuffer = CreateTempCmdBuf();
 	vkCmdCopyImage(tempBuffer,
@@ -487,8 +487,8 @@ void VkApp::CopyImage(VkImage src, VkAccessFlags srcAccessMask, VkImageLayout sr
 
 	SubmitTempCmdBufToGraphicsQueue(tempBuffer);
 
-	ImageLayoutTransition(src, VK_ACCESS_TRANSFER_READ_BIT, srcAccessMask, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, srcLayout);
-	ImageLayoutTransition(dst, VK_ACCESS_TRANSFER_WRITE_BIT, dstAccessMask, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, dstLayout);
+	ImageLayoutTransition(src, srcAccessMask, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, srcLayout);
+	ImageLayoutTransition(dst, dstAccessMask, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, dstLayout);
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VkApp::DebugCallback(
