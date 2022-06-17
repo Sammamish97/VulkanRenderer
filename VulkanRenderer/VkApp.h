@@ -10,8 +10,8 @@
 #include "VulkanDevice.h"
 #include <chrono>
 
-const uint32_t WIDTH = 1080;
-const uint32_t HEIGHT = 720;
+const uint32_t WIDTH = 1920;
+const uint32_t HEIGHT = 1055;
 
 #define TEX_DIM 2048
 #define TEX_FILTER VK_FILTER_LINEAR
