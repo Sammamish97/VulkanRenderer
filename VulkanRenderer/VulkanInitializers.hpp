@@ -253,4 +253,18 @@ namespace initializers
 		imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		return imageMemoryBarrier;
 	}
+
+	inline VkImageCreateInfo imageCreateInfo()
+	{
+		VkImageCreateInfo imageCreateInfo{};
+		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		return imageCreateInfo;
+	}
+
+	inline VkMemoryAllocateInfo memoryAllocateInfo()
+	{
+		VkMemoryAllocateInfo memAllocInfo{};
+		memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		return memAllocInfo;
+	}
 }

@@ -180,6 +180,7 @@
     <ClCompile Include="VkApp.cpp" />
     <ClCompile Include="VulkanBuffer.cpp" />
     <ClCompile Include="VulkanDevice.cpp" />
+    <ClCompile Include="VulkanFrameBuffer.cpp" />
     <ClCompile Include="VulkanTools.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -196,6 +197,7 @@
     <ClInclude Include="VkApp.h" />
     <ClInclude Include="VulkanBuffer.h" />
     <ClInclude Include="VulkanDevice.h" />
+    <ClInclude Include="VulkanFrameBuffer.h" />
     <ClInclude Include="VulkanInitializers.hpp" />
     <ClInclude Include="VulkanTools.h" />
   </ItemGroup>
