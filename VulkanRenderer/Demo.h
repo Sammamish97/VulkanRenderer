@@ -85,6 +85,12 @@ private:
 
 	void UpdateUniformBuffer(uint32_t currentImage);
 
+//
+	void CreateTextureImage();
+	void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
+		VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
+
+
 private:
 	VkDescriptorPool mImguiDescPool{ VK_NULL_HANDLE };
 
@@ -111,6 +117,10 @@ private:
 	UniformBufferLights lightsData;
 	VkDescriptorPool descriptorPool;
 	VkSampler colorSampler;
+
+//Texture
+	VkImage textureImage;
+	VkDeviceMemory textureImageMemory;
 
 //FrameBuffer & Render related
 	Buffer matUBO;

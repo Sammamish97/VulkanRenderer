@@ -67,6 +67,8 @@ protected:
 
 	void ImageLayoutTransition(VkImage attachment, VkAccessFlags dstAccessMask, VkImageLayout beforeLayout, VkImageLayout afterLayout);
 	void CopyImage(VkImage src, VkAccessFlags srcAccessMask, VkImageLayout srcLayout, VkImage dst, VkAccessFlags dstAccessMask, VkImageLayout dstLayout);
+	void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
 private:
 	void SetupDebugMessenger();
