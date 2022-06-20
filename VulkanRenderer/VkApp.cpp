@@ -532,6 +532,7 @@ void VkApp::CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, ui
 void VkApp::CreateTextureImage(const std::string& file, VkImage& image, VkDeviceMemory& memory)
 {
 	int texWidth, texHeight, texChannels;
+	stbi_set_flip_vertically_on_load(true);
 	stbi_uc* pixels = stbi_load(file.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 	VkDeviceSize imageSize = texWidth * texHeight * 4;//4 bytes per pixel
 

@@ -34,7 +34,7 @@ void main()
     for(int i = 0; i < 3; ++i)
     {
         vec3 norm_l = normalize(pointLight.pointlights[i].pos - fragPos);
-        float diff = max(dot(norm_l, norm_n), 0);
+        float diff = max(dot(norm_l, norm_n), 0.2f);
         vec3 diffuse = diff * pointLight.pointlights[i].color;
 
         result += (diffuse) * vec3(albedo);

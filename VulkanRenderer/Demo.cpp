@@ -215,7 +215,7 @@ void Demo::LoadMeshAndObjects()
 
 void Demo::LoadTextures()
 {
-	CreateTextureImage("../textures/02.png", testImage.image, testImage.memory);
+	CreateTextureImage("../textures/block.jpg", testImage.image, testImage.memory);
 	testImage.imageView = CreateImageView(testImage.image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
 	testImage.sampler = CreateTextureSampler();
 	testImage.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
