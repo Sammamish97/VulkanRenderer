@@ -1,6 +1,6 @@
 #pragma once
 #include <vector>
-#include <glm/vec3.hpp>
+#include <glm/glm.hpp>
 #include <vulkan/vulkan_core.h>
 #include <array>
 
@@ -10,7 +10,7 @@ struct Vertex
 {
 	glm::vec3 position;
 	glm::vec3 normal;
-	glm::vec3 color;
+	glm::vec2 UV;
 
 	static VkVertexInputBindingDescription getBindingDescription();
 	static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions();

@@ -65,10 +65,17 @@ protected:
 	void SubmitTempCmdBufToGraphicsQueue(VkCommandBuffer cmdBuffer);
 	void SubmitTempCmdBufToTransferQueue(VkCommandBuffer cmdBuffer);//TODO: Use template or overload
 
-	void ImageLayoutTransition(VkImage attachment, VkAccessFlags dstAccessMask, VkImageLayout beforeLayout, VkImageLayout afterLayout);
+	void ImageLayoutTransition(VkImage attachment, VkAccessFlags dstAccessMask, VkPipelineStageFlags dstStage, VkImageLayout beforeLayout, VkImageLayout afterLayout);
 	void CopyImage(VkImage src, VkAccessFlags srcAccessMask, VkImageLayout srcLayout, VkImage dst, VkAccessFlags dstAccessMask, VkImageLayout dstLayout);
 	void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+
+	void CreateTextureImage(const std::string& file, VkImage& image, VkDeviceMemory& memory);
+	void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
+		VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
+	VkImageView CreateImageView(VkImage& image, VkFormat imageFormat, VkImageAspectFlagBits aspect);
+	VkSampler CreateTextureSampler();
+
 
 private:
 	void SetupDebugMessenger();

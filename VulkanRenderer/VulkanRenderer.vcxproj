@@ -171,6 +171,7 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Demo.cpp" />
     <ClCompile Include="DirLight.cpp" />
+    <ClCompile Include="ImageWrap.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Object.cpp" />
@@ -188,6 +189,7 @@
     <ClInclude Include="Demo.h" />
     <ClInclude Include="DirLight.h" />
     <ClInclude Include="FrameBuffer.h" />
+    <ClInclude Include="ImageWrap.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="PointLight.h" />

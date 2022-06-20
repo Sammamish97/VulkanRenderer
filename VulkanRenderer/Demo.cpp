@@ -3,7 +3,6 @@
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
-#include <stb_image.h>
 
 #include "VulkanTools.h"
 #include "VulkanInitializers.hpp"
@@ -21,6 +20,7 @@ void Demo::Init()
 	SetupCallBacks();
 	
 	LoadMeshAndObjects();
+	LoadTextures();
 	CreateLight();
 	CreateCamera();
 	CreateSyncObjects();
@@ -202,7 +202,7 @@ void Demo::LoadMeshAndObjects()
 	redMesh->loadAndCreateMesh("../models/Sphere.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
 	greenMesh = new Mesh;
-	greenMesh->loadAndCreateMesh("../models/Monkey.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));
+	greenMesh->loadAndCreateMesh("../models/Plane.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
 	BlueMesh = new Mesh;
 	BlueMesh->loadAndCreateMesh("../models/Torus.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
@@ -211,6 +211,14 @@ void Demo::LoadMeshAndObjects()
 	objects.push_back(new Object(redMesh, glm::vec3(0.f, 0.f, 3.f)));
 	objects.push_back(new Object(greenMesh, glm::vec3(3.f, 0.f, 0.f)));
 	objects.push_back(new Object(BlueMesh, glm::vec3(-3.f, 0.f, 0.f)));
+}
+
+void Demo::LoadTextures()
+{
+	CreateTextureImage("../textures/02.png", testImage.image, testImage.memory);
+	testImage.imageView = CreateImageView(testImage.image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+	testImage.sampler = CreateTextureSampler();
+	testImage.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
 void Demo::CreateLight()
@@ -549,24 +557,28 @@ void Demo::CreateDescriptorPool()
 {
 	VkDescriptorPoolSize matPoolsize{};
 	matPoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	matPoolsize.descriptorCount = 2;
+	matPoolsize.descriptorCount = 2;//2 for view, project
 
 	VkDescriptorPoolSize Lightpoolsize{};
 	Lightpoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	Lightpoolsize.descriptorCount = 2;
+	Lightpoolsize.descriptorCount = 2;//2 for point lights, look vec
 
 	VkDescriptorPoolSize GBufferAttachmentSize{};
 	GBufferAttachmentSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	GBufferAttachmentSize.descriptorCount = 3;
+	GBufferAttachmentSize.descriptorCount = 3;//3 for albedo, normal, position
 
-	std::vector<VkDescriptorPoolSize> poolSizes = { matPoolsize, Lightpoolsize, GBufferAttachmentSize };
+	VkDescriptorPoolSize ModelTexturesSize{};
+	ModelTexturesSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	ModelTexturesSize.descriptorCount = 1;//1 for diffuse
+
+	std::vector<VkDescriptorPoolSize> poolSizes = { matPoolsize, Lightpoolsize, GBufferAttachmentSize, ModelTexturesSize };
 
 	VkDescriptorPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 	poolInfo.pPoolSizes = poolSizes.data();
 
-	poolInfo.maxSets = 3;
+	poolInfo.maxSets = poolSizes.size();
 
 	if (vkCreateDescriptorPool(mVulkanDevice->logicalDevice, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS)
 	{
@@ -630,6 +642,13 @@ void Demo::CreateDescriptorSetLayout()
 	albedoTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	albedoTextureBinding.pImmutableSamplers = nullptr;
 
+	VkDescriptorSetLayoutBinding diffuseTextureBinding{};
+	diffuseTextureBinding.binding = 5;
+	diffuseTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	diffuseTextureBinding.descriptorCount = 1;
+	diffuseTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	diffuseTextureBinding.pImmutableSamplers = nullptr;
+
 	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = { lightLayoutBinding, positionTextureBinding, normalTextureBinding, albedoTextureBinding };
 	VkDescriptorSetLayoutCreateInfo lightDescriptorLayout = initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mVulkanDevice->logicalDevice, &lightDescriptorLayout, nullptr, &LightDescriptorSetLayout))
@@ -638,7 +657,7 @@ void Demo::CreateDescriptorSetLayout()
 	VK_CHECK_RESULT(vkCreatePipelineLayout(mVulkanDevice->logicalDevice, &LightpipelineLayoutCreateInfo, nullptr, &LightPipelineLayout))
 	//Create Lighting descriptor set layout and pipeilne layout
 
-	std::vector<VkDescriptorSetLayoutBinding> GLayoutBinding = { matLayoutBinding };
+	std::vector<VkDescriptorSetLayoutBinding> GLayoutBinding = { matLayoutBinding, diffuseTextureBinding };
 	VkDescriptorSetLayoutCreateInfo GDescriptorLayout = initializers::descriptorSetLayoutCreateInfo(GLayoutBinding);
 
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mVulkanDevice->logicalDevice, &GDescriptorLayout, nullptr, &GDescriptorSetLayout))
@@ -717,6 +736,11 @@ void Demo::CreateDescriptorSet()
 	GAllocInfo.descriptorSetCount = 1;
 	GAllocInfo.pSetLayouts = &GDescriptorSetLayout;
 
+	VkDescriptorImageInfo modelDiffuseDisc;
+	modelDiffuseDisc.sampler = testImage.sampler;
+	modelDiffuseDisc.imageView = testImage.imageView;
+	modelDiffuseDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
 	if (vkAllocateDescriptorSets(mVulkanDevice->logicalDevice, &GAllocInfo, &GBufferDescriptorSet) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to allocate descriptor sets");
@@ -729,7 +753,8 @@ void Demo::CreateDescriptorSet()
 
 	std::vector<VkWriteDescriptorSet> GBufWriteDescriptorSets;
 	GBufWriteDescriptorSets = {
-		initializers::writeDescriptorSet(GBufferDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &GBufferInfo)
+		initializers::writeDescriptorSet(GBufferDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &GBufferInfo),
+		initializers::writeDescriptorSet(GBufferDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5, &modelDiffuseDisc)
 	};
 
 	vkUpdateDescriptorSets(mVulkanDevice->logicalDevice, static_cast<uint32_t>(GBufWriteDescriptorSets.size()), GBufWriteDescriptorSets.data(), 0, nullptr);
@@ -1139,65 +1164,4 @@ void Demo::DrawGUI()
 	ImGui::ColorPicker3("Light1", &lightsData.point_light[0].mColor[0]);
 	ImGui::ColorPicker3("Light2", &lightsData.point_light[1].mColor[0]);
 	ImGui::ColorPicker3("Light3", &lightsData.point_light[2].mColor[0]);
-}
-
-void Demo::CreateTextureImage()
-{
-	int texWidth, texHeight, texChannels;
-	stbi_uc* pixels = stbi_load("../textures/02.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-	VkDeviceSize imageSize = texWidth * texHeight * 4;//4 bytes per pixel
-
-	VkBuffer stagingBuffer; 
-	VkDeviceMemory stagingBufferMemory;
-
-	mVulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		imageSize, &stagingBuffer, &stagingBufferMemory);
-
-	void* data;
-	vkMapMemory(mVulkanDevice->logicalDevice, stagingBufferMemory, 0, imageSize, 0, &data);
-	memcpy(data, pixels, static_cast<size_t>(imageSize));
-	vkUnmapMemory(mVulkanDevice->logicalDevice, stagingBufferMemory);
-	stbi_image_free(pixels);
-
-	CreateImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, 
-		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
-}
-
-void Demo::CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
-	VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
-{
-	VkImageCreateInfo imageInfo{};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent.width = width;
-	imageInfo.extent.height = height;
-	imageInfo.extent.depth = 1;
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.format = format;
-	imageInfo.tiling = tiling;
-	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	imageInfo.usage = usage;
-	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	imageInfo.flags = 0; // Optional
-
-	if (vkCreateImage(mVulkanDevice->logicalDevice, &imageInfo, nullptr, &textureImage) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to create image!");
-	}
-
-	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(mVulkanDevice->logicalDevice, textureImage, &memRequirements);
-
-	VkMemoryAllocateInfo allocInfo = initializers::memoryAllocateInfo();
-	allocInfo.allocationSize = memRequirements.size;
-	allocInfo.memoryTypeIndex = mVulkanDevice->getMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	if (vkAllocateMemory(mVulkanDevice->logicalDevice, &allocInfo, nullptr, &textureImageMemory))
-	{
-		throw std::runtime_error("failed to allocate image memory!");
-	}
-
-	vkBindImageMemory(mVulkanDevice->logicalDevice, textureImage, textureImageMemory, 0);
 }

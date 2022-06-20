@@ -5,6 +5,7 @@
 #include "Object.h"
 #include "UniformStructure.h"
 #include "FrameBuffer.h"
+#include "ImageWrap.h"
 
 struct GFrameBuffer
 {
@@ -54,6 +55,7 @@ private:
 	void SetupCallBacks();
 
 	void LoadMeshAndObjects();
+	void LoadTextures();
 	void CreateLight();
 	void CreateCamera();
 	void CreateSyncObjects();
@@ -71,7 +73,6 @@ private:
 
 	void CreateUniformBuffers();
 	void CreateDescriptorPool();
-	
 	void CreateDescriptorSetLayout();
 	void CreateDescriptorSet();
 
@@ -84,12 +85,6 @@ private:
 	void BuildPostCommandBuffer(int swapChianIndex);
 
 	void UpdateUniformBuffer(uint32_t currentImage);
-
-//
-	void CreateTextureImage();
-	void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
-		VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
-
 
 private:
 	VkDescriptorPool mImguiDescPool{ VK_NULL_HANDLE };
@@ -119,10 +114,10 @@ private:
 	VkSampler colorSampler;
 
 //Texture
-	VkImage textureImage;
-	VkDeviceMemory textureImageMemory;
+	ImageWrap testImage;
 
 //FrameBuffer & Render related
+	Buffer textureUBO;
 	Buffer matUBO;
 	Buffer lightUBO;
 

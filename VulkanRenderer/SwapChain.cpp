@@ -76,7 +76,7 @@ void SwapChain::InitSwapChainLayout()
 	for (uint32_t i = 0; i < mImageCount; ++i)
 	{
 		//Need to know access mask
-		mApp->ImageLayoutTransition(mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.image, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+		mApp->ImageLayoutTransition(mSwapChainRenderDatas[i].mFrameBufferData.mColorAttachment.image, 0, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 	}
 }
 

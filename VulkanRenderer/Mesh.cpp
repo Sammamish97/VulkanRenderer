@@ -29,8 +29,8 @@ std::array<VkVertexInputAttributeDescription, 3> Vertex::getAttributeDescription
 
 	attributeDescriptions[2].binding = 0;
 	attributeDescriptions[2].location = 2;
-	attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[2].offset = offsetof(Vertex, color);
+	attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+	attributeDescriptions[2].offset = offsetof(Vertex, UV);
 
 	return attributeDescriptions;
 }
@@ -82,6 +82,9 @@ bool Mesh::loadFromObj(const char* filename, glm::vec3 assignedColor)
 				tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
 				tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
 				tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
+				//vertex uv
+				tinyobj::real_t UV_u = attrib.texcoords[2 * idx.texcoord_index + 0];
+				tinyobj::real_t UV_v = attrib.texcoords[2 * idx.texcoord_index + 1];
 
 				//copy it into our vertex
 				Vertex new_vert;
@@ -93,8 +96,8 @@ bool Mesh::loadFromObj(const char* filename, glm::vec3 assignedColor)
 				new_vert.normal.y = ny;
 				new_vert.normal.z = nz;
 
-				//we are setting the vertex color as the vertex normal. This is just for display purposes
-				new_vert.color = assignedColor;
+				new_vert.UV.x = UV_u;
+				new_vert.UV.y = UV_v;
 
 				vertices.push_back(new_vert);
 			}
