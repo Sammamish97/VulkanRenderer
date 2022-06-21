@@ -55,7 +55,7 @@ private:
 	bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
 	SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice physicalDevice);
 
-protected:
+public:
 	void CreateAttachment(VkFormat format, VkImageUsageFlagBits usage, FrameBufferAttachment* attachment);
 	VkFormat FindDepthFormat();
 	VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
@@ -89,8 +89,10 @@ private:
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData);
 
-protected:
+public:
 	VulkanDevice* mVulkanDevice;
+
+protected:
 	SwapChain* mSwapChain;
 	VkSurfaceKHR mSurface;
 

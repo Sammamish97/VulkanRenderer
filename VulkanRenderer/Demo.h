@@ -6,32 +6,9 @@
 #include "UniformStructure.h"
 #include "FrameBuffer.h"
 #include "ImageWrap.h"
-
-struct GFrameBuffer
-{
-	int32_t width, height;
-	VkFramebuffer framebuffer;
-	FrameBufferAttachment position, normal, albedo;
-	FrameBufferAttachment depth;
-	VkRenderPass renderPass;
-};
-
-struct LFrameBuffer
-{
-	int32_t width, height;
-	VkFramebuffer framebuffer;
-	FrameBufferAttachment composition;
-	VkRenderPass renderPass;
-};
-
-struct PostFrameBuffer
-{
-	int32_t width, height;
-	VkFramebuffer framebuffer;
-	FrameBufferAttachment composition;
-	FrameBufferAttachment depth;
-	VkRenderPass renderPass;
-};
+#include "GFrameBuffer.h"
+#include "LFrameBuffer.h"
+#include "PostFrameBuffer.h"
 
 struct MouseInfo
 {
@@ -59,15 +36,6 @@ private:
 	void CreateLight();
 	void CreateCamera();
 	void CreateSyncObjects();
-//
-	void CreateGRenderPass();
-	void CreateGFramebuffer();
-
-	void CreateLRenderPass();
-	void CreateLFramebuffer();
-
-	void CreatePostRenderPass();
-	void CreatePostFrameBuffer();
 
 	void CreateSampler();
 
