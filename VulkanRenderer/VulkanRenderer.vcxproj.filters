@@ -99,6 +99,24 @@
     <ClCompile Include="PostFrameBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\Include\ktx\lib\checkheader.c">
+      <Filter>KTX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Include\ktx\lib\filestream.c">
+      <Filter>KTX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Include\ktx\lib\hashlist.c">
+      <Filter>KTX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Include\ktx\lib\memstream.c">
+      <Filter>KTX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Include\ktx\lib\swap.c">
+      <Filter>KTX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Include\ktx\lib\texture.c">
+      <Filter>KTX</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h">

@@ -2,11 +2,23 @@
 /* vi: set sw=2 ts=4 expandtab: */
 
 /*
- * Copyright 2010-2020 The Khronos Group Inc.
- * SPDX-License-Identifier: Apache-2.0
+ * Copyright (c) 2010-2018 The Khronos Group Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 /**
+ * @internal
  * @file
  * @~English
  *
@@ -31,6 +43,7 @@
 #define KTX_MEM_DEFAULT_ALLOCATED_SIZE 256
 
 /**
+ * @internal
  * @brief Structure to store information about data allocated for ktxMemStream.
  */
 struct ktxMem
@@ -39,12 +52,13 @@ struct ktxMem
     ktx_uint8_t* bytes;        /*!< pointer to rw data. */
     ktx_size_t alloc_size;       /*!< allocated size of the memory block. */
     ktx_size_t used_size;        /*!< bytes used. Effectively the write position. */
-    ktx_off_t pos;               /*!< read/write position. */
+    ktx_off_t pos;               /*!< read position. */
 };
 
 static KTX_error_code ktxMem_expand(ktxMem* pMem, const ktx_size_t size);
 
 /**
+ * @internal
  * @brief Initialize a ktxMem struct for read-write.
  *
  * Memory for the stream data is allocated internally but the
@@ -67,6 +81,7 @@ ktxMem_construct(ktxMem* pMem)
 }
 
 /**
+ * @internal
  * @brief Create & initialize a ktxMem struct for read-write.
  *
  * @sa ktxMem_construct.
@@ -94,6 +109,7 @@ ktxMem_create(ktxMem** ppMem)
 }
 
 /**
+ * @internal
  * @brief Initialize a ktxMem struct for read-only.
  *
  * @param [in] pMem     pointer to the @c ktxMem to initialize.
@@ -111,6 +127,7 @@ ktxMem_construct_ro(ktxMem* pMem, const void* bytes, ktx_size_t numBytes)
 }
 
 /**
+ * @internal
  * @brief Create & initialize a ktxMem struct for read-only.
  *
  * @sa ktxMem_construct.
@@ -144,6 +161,7 @@ ktxMem_create_ro(ktxMem** ppMem, const void* bytes, ktx_size_t numBytes)
  */
 
 /**
+ * @internal
  * @brief Free the memory of a struct ktxMem.
  *
  * @param pMem pointer to ktxMem to free.
@@ -160,6 +178,7 @@ ktxMem_destroy(ktxMem* pMem, ktx_bool_t freeData)
 
 #ifdef KTXMEM_CLEAR_USED
 /**
+ * @internal
  * @brief Clear the data of a memory stream.
  *
  * @param pMem pointer to ktxMem to clear.
@@ -173,6 +192,7 @@ ktxMem_clear(ktxMem* pMem)
 #endif
 
 /**
+ * @internal
  * @~English
  * @brief Expand a ktxMem to fit to a new size.
  *
@@ -187,7 +207,7 @@ static KTX_error_code
 ktxMem_expand(ktxMem *pMem, const ktx_size_t newsize)
 {
     ktx_size_t new_alloc_size;
-
+    
     assert(pMem != NULL && newsize != 0);
 
     new_alloc_size = pMem->alloc_size == 0 ?
@@ -221,6 +241,7 @@ ktxMem_expand(ktxMem *pMem, const ktx_size_t newsize)
 }
 
 /**
+ * @internal
  * @~English
  * @brief Read bytes from a ktxMemStream.
  *
@@ -241,14 +262,14 @@ KTX_error_code ktxMemStream_read(ktxStream* str, void* dst, const ktx_size_t cou
     ktxMem* mem;
     ktx_off_t newpos;
     const ktx_uint8_t* bytes;
+    
 
-
-    if (!str || (mem = str->data.mem)== 0)
+    if (!str || !(mem = str->data.mem))
         return KTX_INVALID_VALUE;
 
     newpos = mem->pos + count;
     /* The first clause checks for overflow. */
-    if (newpos < mem->pos || (ktx_uint32_t)newpos > mem->used_size)
+    if (newpos < mem->pos || newpos > mem->used_size)
         return KTX_FILE_UNEXPECTED_EOF;
 
     bytes = mem->robytes ? mem->robytes : mem->bytes;
@@ -259,6 +280,7 @@ KTX_error_code ktxMemStream_read(ktxStream* str, void* dst, const ktx_size_t cou
 }
 
 /**
+ * @internal
  * @~English
  * @brief Skip bytes in a ktxMemStream.
  *
@@ -276,13 +298,13 @@ KTX_error_code ktxMemStream_skip(ktxStream* str, const ktx_size_t count)
 {
     ktxMem* mem;
     ktx_off_t newpos;
-
-    if (!str || (mem = str->data.mem) == 0)
+    
+    if (!str || !(mem = str->data.mem))
         return KTX_INVALID_VALUE;
-
+    
     newpos = mem->pos + count;
     /* The first clause checks for overflow. */
-    if (newpos < mem->pos || (ktx_uint32_t)newpos > mem->used_size)
+    if (newpos < mem->pos || newpos > mem->used_size)
         return KTX_FILE_UNEXPECTED_EOF;
 
     mem->pos = newpos;
@@ -291,6 +313,7 @@ KTX_error_code ktxMemStream_skip(ktxStream* str, const ktx_size_t count)
 }
 
 /**
+ * @internal
  * @~English
  * @brief Write bytes to a ktxMemStream.
  *
@@ -317,15 +340,14 @@ KTX_error_code ktxMemStream_write(ktxStream* str, const void* src,
     KTX_error_code rc = KTX_SUCCESS;
     ktx_size_t new_size;
 
-    if (!str || (mem = str->data.mem) == 0)
+    if (!str || !(mem = str->data.mem))
         return KTX_INVALID_VALUE;
 
     if (mem->robytes)
         return KTX_INVALID_OPERATION; /* read-only */
 
-    new_size = mem->pos + (size*count);
-    //if (new_size < mem->used_size)
-    if ((ktx_off_t)new_size < mem->pos)
+    new_size = mem->used_size + size*count;
+    if (new_size < mem->used_size)
         return KTX_FILE_OVERFLOW;
 
     if (mem->alloc_size < new_size) {
@@ -334,16 +356,14 @@ KTX_error_code ktxMemStream_write(ktxStream* str, const void* src,
             return rc;
     }
 
-    memcpy(mem->bytes + mem->pos, src, size*count);
-    mem->pos += size*count;
-    if (mem->pos > (ktx_off_t)mem->used_size)
-        mem->used_size = mem->pos;
-
+    memcpy(mem->bytes + mem->used_size, src, size*count);
+    mem->used_size += size*count;
 
     return KTX_SUCCESS;
 }
 
 /**
+ * @internal
  * @~English
  * @brief Get the current read/write position in a ktxMemStream.
  *
@@ -359,14 +379,15 @@ KTX_error_code ktxMemStream_getpos(ktxStream* str, ktx_off_t* const pos)
 {
     if (!str || !pos)
         return KTX_INVALID_VALUE;
-
+    
     assert(str->type == eStreamTypeMemory);
-
+    
     *pos = str->data.mem->pos;
     return KTX_SUCCESS;
 }
 
 /**
+ * @internal
  * @~English
  * @brief Set the current read/write position in a ktxMemStream.
  *
@@ -385,17 +406,18 @@ KTX_error_code ktxMemStream_setpos(ktxStream* str, ktx_off_t pos)
 {
     if (!str)
         return KTX_INVALID_VALUE;
-
+    
     assert(str->type == eStreamTypeMemory);
-
-    if (pos > (ktx_off_t)str->data.mem->alloc_size)
+    
+    if (pos > str->data.mem->alloc_size)
         return KTX_INVALID_OPERATION;
-
+    
     str->data.mem->pos = pos;
     return KTX_SUCCESS;
 }
 
 /**
+ * @internal
  * @~English
  * @brief Get a pointer to a ktxMemStream's data.
  *
@@ -404,7 +426,7 @@ KTX_error_code ktxMemStream_setpos(ktxStream* str, ktx_off_t pos)
  *
  * @param [in] str       pointer to the ktxStream whose data pointer is to
  *                       be queried.
- * @param [in,out] ppBytes  pointer to a variable in which the data pointer
+ * @param [in,out] size  pointer to a variable in which the data pointer
  *                       will be written.
  *
  * @return      KTX_SUCCESS on success, other KTX_* enum values on error.
@@ -423,6 +445,7 @@ KTX_error_code ktxMemStream_getdata(ktxStream* str, ktx_uint8_t** ppBytes)
 }
 
 /**
+ * @internal
  * @~English
  * @brief Get the size of a ktxMemStream in bytes.
  *
@@ -438,14 +461,15 @@ KTX_error_code ktxMemStream_getsize(ktxStream* str, ktx_size_t* pSize)
 {
     if (!str || !pSize)
         return KTX_INVALID_VALUE;
-
+    
     assert(str->type == eStreamTypeMemory);
-
+    
     *pSize = str->data.mem->used_size;
     return KTX_SUCCESS;
 }
 
 /**
+ * @internal
  * @~English
  * @brief Setup ktxMemStream function pointers.
  */
@@ -463,6 +487,7 @@ ktxMemStream_setup(ktxStream* str)
 }
 
 /**
+ * @internal
  * @~English
  * @brief Initialize a read-write ktxMemStream.
  *
@@ -500,12 +525,13 @@ KTX_error_code ktxMemStream_construct(ktxStream* str,
 }
 
 /**
+ * @internal
  * @~English
  * @brief Initialize a read-only ktxMemStream.
  *
  * @param [in] str      pointer to a ktxStream struct to initialize.
  * @param [in] bytes    pointer to an array of bytes containing the data.
- * @param [in] numBytes     size of array of data for ktxMemStream.
+ * @param [in] size     size of array of data for ktxMemStream.
  *
  * @return      KTX_SUCCESS on success, other KTX_* enum values on error.
  *
@@ -536,6 +562,7 @@ KTX_error_code ktxMemStream_construct_ro(ktxStream* str,
 }
 
 /**
+ * @internal
  * @~English
  * @brief Free the memory used by a ktxMemStream.
  *

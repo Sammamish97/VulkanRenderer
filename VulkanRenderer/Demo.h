@@ -36,7 +36,7 @@ private:
 	void CreateLight();
 	void CreateCamera();
 	void CreateSyncObjects();
-	void LoadCubemap();
+	void LoadCubemap(std::string filename, VkFormat format, bool forceLinearTiling);
 
 	void CreateSampler();
 
