@@ -84,6 +84,8 @@ private:
 
 //Texture
 	ImageWrap testImage;
+	ImageWrap testCubemap;
+	
 
 //FrameBuffer & Render related
 	Buffer textureUBO;

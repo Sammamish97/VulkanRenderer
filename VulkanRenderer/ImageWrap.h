@@ -2,7 +2,10 @@
 #include <vulkan/vulkan.h>
 struct ImageWrap
 {
+    uint32_t width, height;
+    uint32_t mipLevels{};
 	VkImage image{};
+    VkFormat format{};
 	VkDeviceMemory memory{};
 	VkSampler sampler{};
 	VkImageView imageView{};

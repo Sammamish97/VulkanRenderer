@@ -168,12 +168,6 @@
     <ClCompile Include="..\Include\imgui-master\imgui_draw.cpp" />
     <ClCompile Include="..\Include\imgui-master\imgui_tables.cpp" />
     <ClCompile Include="..\Include\imgui-master\imgui_widgets.cpp" />
-    <ClCompile Include="..\Include\KTX\lib\checkheader.c" />
-    <ClCompile Include="..\Include\KTX\lib\filestream.c" />
-    <ClCompile Include="..\Include\KTX\lib\hashlist.c" />
-    <ClCompile Include="..\Include\KTX\lib\memstream.c" />
-    <ClCompile Include="..\Include\KTX\lib\swap.c" />
-    <ClCompile Include="..\Include\KTX\lib\texture.c" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Demo.cpp" />
     <ClCompile Include="DirLight.cpp" />
