@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/KhronosGroup/dfdutils.git
+	branch = master
+	commit = 0e028d747f21142848ec6893ecccfb5c642df784
+	parent = c5abc1611de1b175fc23e3e1497b5c72987e8a67
+	method = merge
+	cmdver = 0.4.3

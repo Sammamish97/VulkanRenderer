@@ -36,6 +36,7 @@ private:
 	void CreateLight();
 	void CreateCamera();
 	void CreateSyncObjects();
+	void LoadCubemap();
 
 	void CreateSampler();
 

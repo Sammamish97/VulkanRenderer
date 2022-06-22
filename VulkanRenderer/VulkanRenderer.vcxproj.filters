@@ -19,6 +19,9 @@
     <Filter Include="IMGUI">
       <UniqueIdentifier>{be5658d0-786b-44ed-98b2-a1b177e582ea}</UniqueIdentifier>
     </Filter>
+    <Filter Include="KTX">
+      <UniqueIdentifier>{d62dab35-6613-436c-a43c-ab0aeb8d1615}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -95,6 +98,24 @@
     </ClCompile>
     <ClCompile Include="PostFrameBuffer.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Include\KTX\lib\checkheader.c">
+      <Filter>KTX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Include\KTX\lib\filestream.c">
+      <Filter>KTX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Include\KTX\lib\hashlist.c">
+      <Filter>KTX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Include\KTX\lib\memstream.c">
+      <Filter>KTX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Include\KTX\lib\swap.c">
+      <Filter>KTX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Include\KTX\lib\texture.c">
+      <Filter>KTX</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

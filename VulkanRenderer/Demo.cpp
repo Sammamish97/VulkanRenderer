@@ -1,11 +1,17 @@
-#include "Demo.h"
-
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
 
+#include <ktx.h>
+#include <ktxvulkan.h>
+
+#include "Demo.h"
+
 #include "VulkanTools.h"
 #include "VulkanInitializers.hpp"
+
+
+
 
 void Demo::run()
 {
@@ -244,6 +250,12 @@ void Demo::CreateSyncObjects()
 	{
 		throw std::runtime_error("failed to create semaphores!");
 	}
+}
+
+void Demo::LoadCubemap()
+{
+	ktxResult result;
+	ktxTexture* ktxTexture;
 }
 
 void Demo::CreateUniformBuffers()
