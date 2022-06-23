@@ -11,21 +11,24 @@ public:
 	void Init(VkApp* app, uint32_t width, uint32_t height);
 	void Update();
 
+	void CreateDescriptorPool(const std::vector<VkDescriptorPoolSize>& poolSizes);
+	void CreateDescriptorLayout(const std::vector<VkDescriptorSetLayoutBinding>& setLayoutBindings);
+	void CreateDescriptorSet();
+
+	void CreateFrameData();
+	void CreatePipelineData();
+
+	void UpdateDescriptorSet(const std::vector<VkWriteDescriptorSet>& writeDescSets);
+
 private:
 	void CreateAttachment();
 	void CreateRenderPass();
 	void CreateFrameBuffer();
 
-	void CreateDescriptorPool();
-	void CreateDescriptorLayout(const std::vector<VkDescriptorSetLayoutBinding>& setLayoutBindings);
-	void CreateDescriptorSet();
-
-	void UpdateDescriptorSet(const std::vector<VkWriteDescriptorSet>& writeDescSets);
-
 	void CreatePipelineLayout();
 	void CreatePipeline();
 
-private:
+public:
 	uint32_t mWidth, mHeight;
 
 	VkFramebuffer mFrameBuffer;

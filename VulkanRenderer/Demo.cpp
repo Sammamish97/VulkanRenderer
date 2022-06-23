@@ -28,18 +28,25 @@ void Demo::Init()
 	CreateCamera();
 	CreateSyncObjects();
 
-	mGFrameBuffer.Init(this);
-	mLFrameBuffer.Init(this);
-	mPFrameBuffer.Init(this, &mGFrameBuffer.depth, &mLFrameBuffer.composition);
+	geometry_pass.Init(this, WIDTH, HEIGHT);
+	lighting_pass.Init(this, WIDTH, HEIGHT);
+	post_pass.Init(this, WIDTH, HEIGHT, &lighting_pass.mComposition, &geometry_pass.mDepth);
+
+	InitDescriptorPool();
+	InitDescriptorLayout();
+	InitDescriptorSet();
+
+	geometry_pass.CreateFrameData();
+	geometry_pass.CreatePipelineData();
+
+	lighting_pass.CreateFrameData();
+	lighting_pass.CreatePipelineData();
+
+	post_pass.CreateFrameData();
+	post_pass.CreatePipelineData();
 
 	CreateUniformBuffers();
-
-	CreateDescriptorPool();
 	CreateSampler();
-	CreateDescriptorSetLayout();
-	CreateDescriptorSet();
-
-	CreateGraphicsPipelines();
 	CreateCommandBuffers();
 
 	InitGUI();
@@ -88,7 +95,8 @@ void Demo::Draw()
 		throw std::runtime_error("failed to acquire swap chain image!");
 	}
 
-	UpdateUniformBuffer(currentFrame);
+	UpdateUniformBuffer();
+	UpdateDescriptorSet();
 
 	vkResetFences(mVulkanDevice->logicalDevice, 1, &inFlightFence);
 
@@ -130,7 +138,7 @@ void Demo::Draw()
 	postSubmitInfo.pWaitDstStageMask = waitStages;
 	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &postSubmitInfo, inFlightFence))
 
-	CopyImage(mPFrameBuffer.colorResult->image, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	CopyImage(post_pass.mLColorResult->image, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			mSwapChain->mSwapChainRenderDatas[imageindex].mFrameBufferData.mColorAttachment.image, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 	VkPresentInfoKHR presentInfo {};
@@ -437,39 +445,6 @@ void Demo::CreateUniformBuffers()
 	mVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &lightUBO, LightbufferSize);
 }
 
-void Demo::CreateDescriptorPool()
-{
-	VkDescriptorPoolSize matPoolsize{};
-	matPoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	matPoolsize.descriptorCount = 2;//2 for view, project
-
-	VkDescriptorPoolSize Lightpoolsize{};
-	Lightpoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	Lightpoolsize.descriptorCount = 2;//2 for point lights, look vec
-
-	VkDescriptorPoolSize GBufferAttachmentSize{};
-	GBufferAttachmentSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	GBufferAttachmentSize.descriptorCount = 3;//3 for albedo, normal, position
-
-	VkDescriptorPoolSize ModelTexturesSize{};
-	ModelTexturesSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	ModelTexturesSize.descriptorCount = 1;//1 for diffuse
-
-	std::vector<VkDescriptorPoolSize> poolSizes = { matPoolsize, Lightpoolsize, GBufferAttachmentSize, ModelTexturesSize };
-
-	VkDescriptorPoolCreateInfo poolInfo{};
-	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-	poolInfo.pPoolSizes = poolSizes.data();
-
-	poolInfo.maxSets = poolSizes.size();
-
-	if (vkCreateDescriptorPool(mVulkanDevice->logicalDevice, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to create descriptor pool!");
-	}
-}
-
 void Demo::CreateSampler()
 {
 	VkSamplerCreateInfo sampler = initializers::samplerCreateInfo();
@@ -487,7 +462,58 @@ void Demo::CreateSampler()
 	VK_CHECK_RESULT(vkCreateSampler(mVulkanDevice->logicalDevice, &sampler, nullptr, &colorSampler));
 }
 
-void Demo::CreateDescriptorSetLayout()
+void Demo::CreateCommandBuffers()
+{
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = mVulkanDevice->mCommandPool;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = 1;
+
+	if (vkAllocateCommandBuffers(mVulkanDevice->logicalDevice, &allocInfo, &GCommandBuffer) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to allocate command buffers!");
+	}
+
+	if (vkAllocateCommandBuffers(mVulkanDevice->logicalDevice, &allocInfo, &LightingCommandBuffer) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to allocate command buffers!");
+	}
+
+	if (vkAllocateCommandBuffers(mVulkanDevice->logicalDevice, &allocInfo, &PostCommandBuffer) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to allocate command buffers!");
+	}
+}
+
+void Demo::InitDescriptorPool()
+{
+	VkDescriptorPoolSize matPoolsize{};
+	matPoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	matPoolsize.descriptorCount = 2;//2 for view, project
+
+	VkDescriptorPoolSize Lightpoolsize{};
+	Lightpoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	Lightpoolsize.descriptorCount = 2;//2 for point lights, look vec
+
+	VkDescriptorPoolSize GBufferAttachmentSize{};
+	GBufferAttachmentSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	GBufferAttachmentSize.descriptorCount = 3;//3 for albedo, normal, position
+
+	VkDescriptorPoolSize ModelTexturesSize{};
+	ModelTexturesSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	ModelTexturesSize.descriptorCount = 1;//1 for diffuse
+
+	std::vector<VkDescriptorPoolSize> gPoolSizes = { matPoolsize, ModelTexturesSize };
+	std::vector<VkDescriptorPoolSize> lPoolSizes = { Lightpoolsize, GBufferAttachmentSize };
+	std::vector<VkDescriptorPoolSize> pPoolSizes = { matPoolsize };
+
+	geometry_pass.CreateDescriptorPool(gPoolSizes);
+	lighting_pass.CreateDescriptorPool(lPoolSizes);
+	post_pass.CreateDescriptorPool(pPoolSizes);
+}
+
+void Demo::InitDescriptorLayout()
 {
 	//Binding 0: view/projection mat & view vector
 	VkDescriptorSetLayoutBinding matLayoutBinding{};
@@ -533,260 +559,21 @@ void Demo::CreateDescriptorSetLayout()
 	diffuseTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	diffuseTextureBinding.pImmutableSamplers = nullptr;
 
-	std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = { lightLayoutBinding, positionTextureBinding, normalTextureBinding, albedoTextureBinding };
-	VkDescriptorSetLayoutCreateInfo lightDescriptorLayout = initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mVulkanDevice->logicalDevice, &lightDescriptorLayout, nullptr, &LightDescriptorSetLayout))
-
-	VkPipelineLayoutCreateInfo LightpipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&LightDescriptorSetLayout, 1);
-	VK_CHECK_RESULT(vkCreatePipelineLayout(mVulkanDevice->logicalDevice, &LightpipelineLayoutCreateInfo, nullptr, &LightPipelineLayout))
-	//Create Lighting descriptor set layout and pipeilne layout
-
 	std::vector<VkDescriptorSetLayoutBinding> GLayoutBinding = { matLayoutBinding, diffuseTextureBinding };
-	VkDescriptorSetLayoutCreateInfo GDescriptorLayout = initializers::descriptorSetLayoutCreateInfo(GLayoutBinding);
+	geometry_pass.CreateDescriptorLayout(GLayoutBinding);
 
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mVulkanDevice->logicalDevice, &GDescriptorLayout, nullptr, &GDescriptorSetLayout))
-	VkPushConstantRange pushConstant;
-	pushConstant.offset = 0;
-	pushConstant.size = sizeof(glm::mat4);
-	pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT;
+	std::vector<VkDescriptorSetLayoutBinding> LLayoutBindings = { lightLayoutBinding, positionTextureBinding, normalTextureBinding, albedoTextureBinding };
+	lighting_pass.CreateDescriptorLayout(LLayoutBindings);
 
-	VkPipelineLayoutCreateInfo GpipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&GDescriptorSetLayout, 1);
-	GpipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-	GpipelineLayoutCreateInfo.pPushConstantRanges = &pushConstant;
-
-	VK_CHECK_RESULT(vkCreatePipelineLayout(mVulkanDevice->logicalDevice, &GpipelineLayoutCreateInfo, nullptr, &GPipelineLayout))
-	//Create G path descriptor set layout and pipeline layout
-
-	std::vector<VkDescriptorSetLayoutBinding> PLayoutbindings = { matLayoutBinding };
-	VkDescriptorSetLayoutCreateInfo PDescriptorSetLayoutCI = initializers::descriptorSetLayoutCreateInfo(PLayoutbindings);
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mVulkanDevice->logicalDevice, &PDescriptorSetLayoutCI, nullptr, &PostDescriptorSetLayout))
-
-	VkPipelineLayoutCreateInfo PostPipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&PostDescriptorSetLayout, 1);
-	PostPipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-	PostPipelineLayoutCreateInfo.pPushConstantRanges = &pushConstant;
-	VK_CHECK_RESULT(vkCreatePipelineLayout(mVulkanDevice->logicalDevice, &PostPipelineLayoutCreateInfo, nullptr, &PostPipelineLayaout))
-	//Create P path descriptor set layout and pipeline layout.
+	std::vector<VkDescriptorSetLayoutBinding> PLayoutBindings = { matLayoutBinding };
+	post_pass.CreateDescriptorLayout(PLayoutBindings);
 }
 
-void Demo::CreateDescriptorSet()
+void Demo::InitDescriptorSet()
 {
-	VkDescriptorSetAllocateInfo lightingAllocInfo{};
-	lightingAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	lightingAllocInfo.descriptorPool = descriptorPool;
-	lightingAllocInfo.descriptorSetCount = 1;
-	lightingAllocInfo.pSetLayouts = &LightDescriptorSetLayout;
-
-	VkDescriptorImageInfo texPosDisc;
-	texPosDisc.sampler = colorSampler;
-	texPosDisc.imageView = mGFrameBuffer.position.view;
-	texPosDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	VkDescriptorImageInfo texNormalDisc;
-	texNormalDisc.sampler = colorSampler;
-	texNormalDisc.imageView = mGFrameBuffer.normal.view;
-	texNormalDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	VkDescriptorImageInfo texColorDisc;
-	texColorDisc.sampler = colorSampler;
-	texColorDisc.imageView = mGFrameBuffer.albedo.view;
-	texColorDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	// Deferred composition
-	if (vkAllocateDescriptorSets(mVulkanDevice->logicalDevice, &lightingAllocInfo, &LightingDescriptorSet) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to allocate descriptor sets");
-	}
-
-	VkDescriptorBufferInfo LightbufferInfo{};
-	LightbufferInfo.buffer = lightUBO.buffer;
-	LightbufferInfo.offset = 0;
-	LightbufferInfo.range = sizeof(UniformBufferLights);
-
-	//Descriptor Sets for Lighting
-	std::vector<VkWriteDescriptorSet> lightWriteDescriptorSets;
-	lightWriteDescriptorSets = {
-		initializers::writeDescriptorSet(LightingDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &LightbufferInfo),
-		initializers::writeDescriptorSet(LightingDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &texPosDisc),
-		initializers::writeDescriptorSet(LightingDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &texNormalDisc),
-		initializers::writeDescriptorSet(LightingDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &texColorDisc),
-	};
-
-	vkUpdateDescriptorSets(mVulkanDevice->logicalDevice, static_cast<uint32_t>(lightWriteDescriptorSets.size()), lightWriteDescriptorSets.data(), 0, nullptr);
-	// L-Buffer description set
-
-	VkDescriptorSetAllocateInfo GAllocInfo{};
-	GAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	GAllocInfo.descriptorPool = descriptorPool;
-	GAllocInfo.descriptorSetCount = 1;
-	GAllocInfo.pSetLayouts = &GDescriptorSetLayout;
-
-	VkDescriptorImageInfo modelDiffuseDisc;
-	modelDiffuseDisc.sampler = testImage.sampler;
-	modelDiffuseDisc.imageView = testImage.imageView;
-	modelDiffuseDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	if (vkAllocateDescriptorSets(mVulkanDevice->logicalDevice, &GAllocInfo, &GBufferDescriptorSet) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to allocate descriptor sets");
-	}
-
-	VkDescriptorBufferInfo GBufferInfo{};
-	GBufferInfo.buffer = matUBO.buffer;
-	GBufferInfo.offset = 0;
-	GBufferInfo.range = sizeof(UniformBufferMat);
-
-	std::vector<VkWriteDescriptorSet> GBufWriteDescriptorSets;
-	GBufWriteDescriptorSets = {
-		initializers::writeDescriptorSet(GBufferDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &GBufferInfo),
-		initializers::writeDescriptorSet(GBufferDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5, &modelDiffuseDisc)
-	};
-
-	vkUpdateDescriptorSets(mVulkanDevice->logicalDevice, static_cast<uint32_t>(GBufWriteDescriptorSets.size()), GBufWriteDescriptorSets.data(), 0, nullptr);
-	// G-Buffer description set
-
-	VkDescriptorSetAllocateInfo PAllocInfo = {};
-	PAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	PAllocInfo.descriptorPool = descriptorPool;
-	PAllocInfo.descriptorSetCount = 1;
-	PAllocInfo.pSetLayouts = &PostDescriptorSetLayout;
-
-	if (vkAllocateDescriptorSets(mVulkanDevice->logicalDevice, &PAllocInfo, &PostDescriptorSet) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to allocate descriptor sets");
-	}
-
-	VkDescriptorBufferInfo PBufferInfo{};
-	PBufferInfo.buffer = matUBO.buffer;
-	PBufferInfo.offset = 0;
-	PBufferInfo.range = sizeof(UniformBufferMat);
-
-	std::vector<VkWriteDescriptorSet> PBufWriteDescriptorSets;
-	PBufWriteDescriptorSets = {
-		initializers::writeDescriptorSet(PostDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &PBufferInfo)
-	};
-
-	vkUpdateDescriptorSets(mVulkanDevice->logicalDevice, static_cast<uint32_t>(PBufWriteDescriptorSets.size()), PBufWriteDescriptorSets.data(), 0, nullptr);
-}
-
-void Demo::CreateGraphicsPipelines()
-{
-	VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
-		initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
-	VkPipelineRasterizationStateCreateInfo rasterizationState =
-		initializers::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
-	VkPipelineColorBlendAttachmentState blendAttachmentState =
-		initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
-	VkPipelineColorBlendStateCreateInfo colorBlendState =
-		initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
-	VkPipelineDepthStencilStateCreateInfo depthStencilState =
-		initializers::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
-	VkPipelineViewportStateCreateInfo viewportState =
-		initializers::pipelineViewportStateCreateInfo(1, 1, 0);
-	VkPipelineMultisampleStateCreateInfo multisampleState =
-		initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
-	std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-	VkPipelineDynamicStateCreateInfo dynamicState =
-		initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
-
-	std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages;
-
-	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(LightPipelineLayout, mLFrameBuffer.renderPass);
-	pipelineCI.pInputAssemblyState = &inputAssemblyState;
-	pipelineCI.pRasterizationState = &rasterizationState;
-	pipelineCI.pColorBlendState = &colorBlendState;
-	pipelineCI.pMultisampleState = &multisampleState;
-	pipelineCI.pViewportState = &viewportState;
-	pipelineCI.pDepthStencilState = &depthStencilState;
-	pipelineCI.pDynamicState = &dynamicState;
-	pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
-	pipelineCI.pStages = shaderStages.data();
-
-	rasterizationState.cullMode = VK_CULL_MODE_FRONT_BIT;
-	shaderStages[0] = createShaderStageCreateInfo("../shaders/LightingVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mVulkanDevice->logicalDevice);
-	shaderStages[1] = createShaderStageCreateInfo("../shaders/LightingFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mVulkanDevice->logicalDevice);
-
-	VkPipelineVertexInputStateCreateInfo emptyInput = initializers::pipelineVertexInputStateCreateInfo();
-	pipelineCI.pVertexInputState = &emptyInput;
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(mVulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &LightingPipeline))
-		//Finish create lighting graphics pipeline.
-		//Sequently create G buffer graphics pipeline for utilize created pipeline parameters.
-
-	VkPipelineVertexInputStateCreateInfo vertexInputInfo {};
-
-	auto bindingDescription = Vertex::getBindingDescription();
-	auto attributeDescriptions = Vertex::getAttributeDescriptions();
-
-	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = 1;
-	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
-
-	pipelineCI.layout = GPipelineLayout;
-	pipelineCI.pVertexInputState = &vertexInputInfo;
-	rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
-
-	shaderStages[0] = createShaderStageCreateInfo("../shaders/GBufferVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mVulkanDevice->logicalDevice);
-	shaderStages[1] = createShaderStageCreateInfo("../shaders/GBufferFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mVulkanDevice->logicalDevice);//TODO: GBuffer GLSL 새로 써야함.
-
-	pipelineCI.renderPass = mGFrameBuffer.renderPass;
-
-	// Blend attachment states required for all color attachments
-		// This is important, as color write mask will otherwise be 0x0 and you
-		// won't see anything rendered to the attachment
-	std::array<VkPipelineColorBlendAttachmentState, 3> blendAttachmentStates = {
-		initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE),
-		initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE),
-		initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE)
-	};
-
-	colorBlendState.attachmentCount = static_cast<uint32_t>(blendAttachmentStates.size());
-	colorBlendState.pAttachments = blendAttachmentStates.data();
-
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(mVulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &GBufferPipeline))
-	// Finish create G-graphics pipeline
-
-	std::array<VkPipelineShaderStageCreateInfo, 3> geometryShaderStages;
-	geometryShaderStages[0] = createShaderStageCreateInfo("../shaders/BaseVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mVulkanDevice->logicalDevice);
-	geometryShaderStages[1] = createShaderStageCreateInfo("../shaders/NormalDebug.spv", VK_SHADER_STAGE_GEOMETRY_BIT, mVulkanDevice->logicalDevice);
-	geometryShaderStages[2] = createShaderStageCreateInfo("../shaders/BaseFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mVulkanDevice->logicalDevice);
-
-	pipelineCI.stageCount = static_cast<uint32_t>(geometryShaderStages.size());
-	pipelineCI.pStages = geometryShaderStages.data();
-
-	pipelineCI.layout = PostPipelineLayaout;
-	pipelineCI.pVertexInputState = &vertexInputInfo;
-	rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;//TODO: Maybe problem.
-
-	pipelineCI.renderPass = mPFrameBuffer.renderPass;
-
-	//TODO: Maybe blend state is problem.
-	colorBlendState = initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(mVulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &PostPipeline))
-}
-
-void Demo::CreateCommandBuffers()
-{
-	VkCommandBufferAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = mVulkanDevice->mCommandPool;
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = 1;
-
-	if (vkAllocateCommandBuffers(mVulkanDevice->logicalDevice, &allocInfo, &GCommandBuffer) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to allocate command buffers!");
-	}
-
-	if (vkAllocateCommandBuffers(mVulkanDevice->logicalDevice, &allocInfo, &LightingCommandBuffer) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to allocate command buffers!");
-	}
-
-	if (vkAllocateCommandBuffers(mVulkanDevice->logicalDevice, &allocInfo, &PostCommandBuffer) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to allocate command buffers!");
-	}
+	geometry_pass.CreateDescriptorSet();
+	lighting_pass.CreateDescriptorSet();
+	post_pass.CreateDescriptorSet();
 }
 
 void Demo::BuildLightCommandBuffer()
@@ -798,26 +585,26 @@ void Demo::BuildLightCommandBuffer()
 	clearValues[1].depthStencil = { 1.f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
-	renderPassBeginInfo.renderPass = mLFrameBuffer.renderPass;
+	renderPassBeginInfo.renderPass = lighting_pass.mRenderPass;
 	renderPassBeginInfo.renderArea.offset.x = 0;
 	renderPassBeginInfo.renderArea.offset.y = 0;
-	renderPassBeginInfo.renderArea.extent.width = mLFrameBuffer.width;
-	renderPassBeginInfo.renderArea.extent.height = mLFrameBuffer.height;
+	renderPassBeginInfo.renderArea.extent.width = lighting_pass.mWidth;
+	renderPassBeginInfo.renderArea.extent.height = lighting_pass.mHeight;
 	renderPassBeginInfo.clearValueCount = 2;
 	renderPassBeginInfo.pClearValues = clearValues;
 
-	renderPassBeginInfo.framebuffer = mLFrameBuffer.framebuffer;
+	renderPassBeginInfo.framebuffer = lighting_pass.mFrameBuffer;
 
 	VK_CHECK_RESULT(vkBeginCommandBuffer(LightingCommandBuffer, &cmdBufInfo))
 		vkCmdBeginRenderPass(LightingCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-	VkViewport viewport = initializers::viewport((float)mLFrameBuffer.width, (float)mLFrameBuffer.height, 0.f, 1.f);
+	VkViewport viewport = initializers::viewport((float)lighting_pass.mWidth, (float)lighting_pass.mHeight, 0.f, 1.f);
 	vkCmdSetViewport(LightingCommandBuffer, 0, 1, &viewport);
-	VkRect2D scissor = initializers::rect2D(mLFrameBuffer.width, mLFrameBuffer.height, 0, 0);
+	VkRect2D scissor = initializers::rect2D(lighting_pass.mWidth, lighting_pass.mHeight, 0, 0);
 	vkCmdSetScissor(LightingCommandBuffer, 0, 1, &scissor);
 
-	vkCmdBindDescriptorSets(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LightPipelineLayout, 0, 1, &LightingDescriptorSet, 0, nullptr);
+	vkCmdBindDescriptorSets(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, lighting_pass.mPipelineLayout, 0, 1, &lighting_pass.mDescriptorSet, 0, nullptr);
 
-	vkCmdBindPipeline(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, LightingPipeline);
+	vkCmdBindPipeline(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, lighting_pass.mPipeline);
 	vkCmdDraw(LightingCommandBuffer, 3, 1, 0, 0);
 
 	ImGui::Render();
@@ -842,10 +629,10 @@ void Demo::BuildGCommandBuffer()
 	clearValues[3].depthStencil = { 1.0f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
-	renderPassBeginInfo.renderPass = mGFrameBuffer.renderPass;
-	renderPassBeginInfo.framebuffer = mGFrameBuffer.framebuffer;
-	renderPassBeginInfo.renderArea.extent.width = mGFrameBuffer.width;
-	renderPassBeginInfo.renderArea.extent.height = mGFrameBuffer.height;
+	renderPassBeginInfo.renderPass = geometry_pass.mRenderPass;
+	renderPassBeginInfo.framebuffer = geometry_pass.mFrameBuffer;
+	renderPassBeginInfo.renderArea.extent.width = geometry_pass.mWidth;
+	renderPassBeginInfo.renderArea.extent.height = geometry_pass.mHeight;
 	renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 	renderPassBeginInfo.pClearValues = clearValues.data();
 
@@ -853,15 +640,15 @@ void Demo::BuildGCommandBuffer()
 
 	vkCmdBeginRenderPass(GCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	VkViewport viewport = initializers::viewport((float)mGFrameBuffer.width, (float)mGFrameBuffer.height, 0.0f, 1.0f);
+	VkViewport viewport = initializers::viewport((float)geometry_pass.mWidth, (float)geometry_pass.mHeight, 0.0f, 1.0f);
 	vkCmdSetViewport(GCommandBuffer, 0, 1, &viewport);
 
-	VkRect2D scissor = initializers::rect2D(mGFrameBuffer.width, mGFrameBuffer.height, 0, 0);
+	VkRect2D scissor = initializers::rect2D(geometry_pass.mWidth, geometry_pass.mHeight, 0, 0);
 	vkCmdSetScissor(GCommandBuffer, 0, 1, &scissor);
 
-	vkCmdBindPipeline(GCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GBufferPipeline);
+	vkCmdBindPipeline(GCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, geometry_pass.mPipeline);
 
-	vkCmdBindDescriptorSets(GCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GPipelineLayout, 0, 1, &GBufferDescriptorSet, 0, nullptr);
+	vkCmdBindDescriptorSets(GCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, geometry_pass.mPipelineLayout, 0, 1, &geometry_pass.mDescriptorSet, 0, nullptr);
 
 	int accumulatingVertices = 0;
 	int accumulatingFaces = 0;
@@ -874,7 +661,7 @@ void Demo::BuildGCommandBuffer()
 		VkDeviceSize offsets[] = { 0 };
 		vkCmdBindVertexBuffers(GCommandBuffer, 0, 1, vertexBuffers, offsets);
 		glm::mat4 modelMat = object->BuildModelMat();
-		vkCmdPushConstants(GCommandBuffer, GPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(glm::mat4), &modelMat);
+		vkCmdPushConstants(GCommandBuffer, geometry_pass.mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(glm::mat4), &modelMat);
 		vkCmdDraw(GCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
 	}
 	totalVertices = accumulatingVertices;
@@ -895,10 +682,10 @@ void Demo::BuildPostCommandBuffer(int swapChianIndex)
 	clearValues[1].depthStencil = { 1.0f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
-	renderPassBeginInfo.renderPass = mPFrameBuffer.renderPass;
-	renderPassBeginInfo.framebuffer = mPFrameBuffer.framebuffer;
-	renderPassBeginInfo.renderArea.extent.width = mPFrameBuffer.width;
-	renderPassBeginInfo.renderArea.extent.height = mPFrameBuffer.height;
+	renderPassBeginInfo.renderPass = post_pass.mRenderPass;
+	renderPassBeginInfo.framebuffer = post_pass.mFrameBuffer;
+	renderPassBeginInfo.renderArea.extent.width = post_pass.mWidth;
+	renderPassBeginInfo.renderArea.extent.height = post_pass.mHeight;
 	renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 	renderPassBeginInfo.pClearValues = clearValues.data();
 
@@ -906,15 +693,15 @@ void Demo::BuildPostCommandBuffer(int swapChianIndex)
 
 	vkCmdBeginRenderPass(PostCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	VkViewport viewport = initializers::viewport((float)mPFrameBuffer.width, (float)mPFrameBuffer.height, 0.0f, 1.0f);
+	VkViewport viewport = initializers::viewport((float)post_pass.mWidth, (float)post_pass.mHeight, 0.0f, 1.0f);
 	vkCmdSetViewport(PostCommandBuffer, 0, 1, &viewport);
 
-	VkRect2D scissor = initializers::rect2D(mPFrameBuffer.width, mPFrameBuffer.height, 0, 0);
+	VkRect2D scissor = initializers::rect2D(post_pass.mWidth, post_pass.mHeight, 0, 0);
 	vkCmdSetScissor(PostCommandBuffer, 0, 1, &scissor);
 
-	vkCmdBindPipeline(PostCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PostPipeline);
+	vkCmdBindPipeline(PostCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_pass.mPipeline);
 
-	vkCmdBindDescriptorSets(PostCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PostPipelineLayaout, 0, 1, &PostDescriptorSet, 0, nullptr);
+	vkCmdBindDescriptorSets(PostCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_pass.mPipelineLayout, 0, 1, &post_pass.mDescriptorSet, 0, nullptr);
 
 	if (DrawNormal == true)
 	{
@@ -924,7 +711,7 @@ void Demo::BuildPostCommandBuffer(int swapChianIndex)
 			VkDeviceSize offsets[] = { 0 };
 			vkCmdBindVertexBuffers(PostCommandBuffer, 0, 1, vertexBuffers, offsets);
 			glm::mat4 modelMat = object->BuildModelMat();
-			vkCmdPushConstants(PostCommandBuffer, PostPipelineLayaout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(glm::mat4), &modelMat);
+			vkCmdPushConstants(PostCommandBuffer, post_pass.mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(glm::mat4), &modelMat);
 			vkCmdDraw(PostCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
 		}
 	}
@@ -937,7 +724,7 @@ void Demo::BuildPostCommandBuffer(int swapChianIndex)
 	VK_CHECK_RESULT(vkEndCommandBuffer(PostCommandBuffer));
 }
 
-void Demo::UpdateUniformBuffer(uint32_t currentImage)
+void Demo::UpdateUniformBuffer()
 {
 	static auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -970,6 +757,61 @@ void Demo::UpdateUniformBuffer(uint32_t currentImage)
 	vkMapMemory(mVulkanDevice->logicalDevice, lightUBO.memory, 0, sizeof(UniformBufferLights), 0, &Lightdata);
 	memcpy(Lightdata, &lightsData, sizeof(lightsData));
 	vkUnmapMemory(mVulkanDevice->logicalDevice, lightUBO.memory);
+}
+
+void Demo::UpdateDescriptorSet()
+{
+	VkDescriptorBufferInfo MatBufferInfo{};
+	MatBufferInfo.buffer = matUBO.buffer;
+	MatBufferInfo.offset = 0;
+	MatBufferInfo.range = sizeof(UniformBufferMat);
+
+	VkDescriptorBufferInfo LightbufferInfo{};
+	LightbufferInfo.buffer = lightUBO.buffer;
+	LightbufferInfo.offset = 0;
+	LightbufferInfo.range = sizeof(UniformBufferLights);
+
+	VkDescriptorImageInfo texPosDisc;
+	texPosDisc.sampler = colorSampler;
+	texPosDisc.imageView = geometry_pass.mPosition.view;
+	texPosDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkDescriptorImageInfo texNormalDisc;
+	texNormalDisc.sampler = colorSampler;
+	texNormalDisc.imageView = geometry_pass.mNormal.view;
+	texNormalDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkDescriptorImageInfo texColorDisc;
+	texColorDisc.sampler = colorSampler;
+	texColorDisc.imageView = geometry_pass.mAlbedo.view;
+	texColorDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkDescriptorImageInfo modelDiffuseDisc;
+	modelDiffuseDisc.sampler = testImage.sampler;
+	modelDiffuseDisc.imageView = testImage.imageView;
+	modelDiffuseDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	std::vector<VkWriteDescriptorSet> GBufWriteDescriptorSets;
+	GBufWriteDescriptorSets = {
+		initializers::writeDescriptorSet(geometry_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &MatBufferInfo),
+		initializers::writeDescriptorSet(geometry_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5, &modelDiffuseDisc)
+	};
+	geometry_pass.UpdateDescriptorSet(GBufWriteDescriptorSets);
+
+	std::vector<VkWriteDescriptorSet> lightWriteDescriptorSets;
+	lightWriteDescriptorSets = {
+		initializers::writeDescriptorSet(lighting_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &LightbufferInfo),
+		initializers::writeDescriptorSet(lighting_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &texPosDisc),
+		initializers::writeDescriptorSet(lighting_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &texNormalDisc),
+		initializers::writeDescriptorSet(lighting_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &texColorDisc),
+	};
+	lighting_pass.UpdateDescriptorSet(lightWriteDescriptorSets);
+	
+	std::vector<VkWriteDescriptorSet> PBufWriteDescriptorSets;
+	PBufWriteDescriptorSets = {
+		initializers::writeDescriptorSet(post_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &MatBufferInfo)
+	};
+	post_pass.UpdateDescriptorSet(PBufWriteDescriptorSets);
 }
 
 void Demo::ProcessInput()

@@ -4,11 +4,10 @@
 #include "Camera.h"
 #include "Object.h"
 #include "UniformStructure.h"
-#include "Attachment.h"
 #include "ImageWrap.h"
-#include "GFrameBuffer.h"
-#include "LFrameBuffer.h"
-#include "PostFrameBuffer.h"
+#include "G_Pass.h"
+#include "L_Pass.h"
+#include "P_Pass.h"
 
 struct MouseInfo
 {
@@ -38,22 +37,22 @@ private:
 	void CreateSyncObjects();
 	void LoadCubemap(std::string filename, VkFormat format, bool forceLinearTiling);
 
+	void InitDescriptorPool();
+	void InitDescriptorLayout();
+	void InitDescriptorSet();
+
+	void UpdateUniformBuffer();
+	void UpdateDescriptorSet();
+
 	void CreateSampler();
 
 	void CreateUniformBuffers();
-	void CreateDescriptorPool();
-	void CreateDescriptorSetLayout();
-	void CreateDescriptorSet();
-
-	void CreateGraphicsPipelines();
 
 	void CreateCommandBuffers();
 
 	void BuildLightCommandBuffer();
 	void BuildGCommandBuffer();
 	void BuildPostCommandBuffer(int swapChianIndex);
-
-	void UpdateUniformBuffer(uint32_t currentImage);
 
 private:
 	VkDescriptorPool mImguiDescPool{ VK_NULL_HANDLE };
@@ -91,26 +90,10 @@ private:
 	Buffer matUBO;
 	Buffer lightUBO;
 
-	GFrameBuffer mGFrameBuffer;
-	LFrameBuffer mLFrameBuffer;
-	PostFrameBuffer mPFrameBuffer;
-
-	VkPipeline GBufferPipeline;
-	VkPipeline LightingPipeline;
-	VkPipeline PostPipeline;
-
-	VkPipelineLayout GPipelineLayout;
-	VkPipelineLayout LightPipelineLayout;
-	VkPipelineLayout PostPipelineLayaout;
-
-	VkDescriptorSetLayout GDescriptorSetLayout;
-	VkDescriptorSetLayout LightDescriptorSetLayout;
-	VkDescriptorSetLayout PostDescriptorSetLayout;
-
-	VkDescriptorSet GBufferDescriptorSet;
-	VkDescriptorSet LightingDescriptorSet;
-	VkDescriptorSet PostDescriptorSet;
-
+	G_Pass geometry_pass;
+	L_Pass lighting_pass;
+	P_Pass post_pass;
+	
 	VkCommandBuffer GCommandBuffer;
 	VkCommandBuffer LightingCommandBuffer;
 	VkCommandBuffer PostCommandBuffer;

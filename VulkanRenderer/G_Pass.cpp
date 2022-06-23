@@ -11,15 +11,17 @@ void G_Pass::Init(VkApp* app, uint32_t width, uint32_t height)
 	mApp = app;
 	mWidth = width;
 	mHeight = height;
+}
 
+void G_Pass::CreateFrameData()
+{
 	CreateAttachment();
 	CreateRenderPass();
 	CreateFrameBuffer();
+}
 
-	CreateDescriptorPool();
-	//CreateDescriptorLayout();TODO: 외부에서 선언된 VkDescriptorSetLayoutBinding을 통해 초기화 해야함!
-	CreateDescriptorSet();
-
+void G_Pass::CreatePipelineData()
+{
 	CreatePipelineLayout();
 	CreatePipeline();
 }
@@ -128,16 +130,10 @@ void G_Pass::CreateFrameBuffer()
 	VK_CHECK_RESULT(vkCreateFramebuffer(mApp->mVulkanDevice->logicalDevice, &fbufCreateInfo, nullptr, &mFrameBuffer));
 }
 
-void G_Pass::CreateDescriptorPool()
+void G_Pass::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize>& poolSizes)
 {
 	//G_Pass use matrix for Uniform data and push constant.
 	//Later, maybe use diffuse, normal, specular map.
-
-	VkDescriptorPoolSize matPoolsize{};
-	matPoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	matPoolsize.descriptorCount = 2;//2 for view, project
-
-	std::vector<VkDescriptorPoolSize> poolSizes = { matPoolsize };
 
 	VkDescriptorPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -174,7 +170,7 @@ void G_Pass::CreateDescriptorSet()
 
 void G_Pass::UpdateDescriptorSet(const std::vector<VkWriteDescriptorSet>& writeDescSets)
 {
-	//TODO: 외부에 저장된 data들을 가지고 와야함!
+	vkUpdateDescriptorSets(mApp->mVulkanDevice->logicalDevice, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
 }
 
 void G_Pass::CreatePipelineLayout()

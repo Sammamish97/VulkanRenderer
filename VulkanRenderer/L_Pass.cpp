@@ -11,15 +11,18 @@ void L_Pass::Init(VkApp* app, uint32_t width, uint32_t height)
 	mApp = app;
 	mWidth = width;
 	mHeight = height;
+}
 
+void L_Pass::CreateFrameData()
+{
 	CreateAttachment();
 	CreateRenderPass();
 	CreateFrameBuffer();
 
-	CreateDescriptorPool();
-	//CreateDescriptorLayout();TODO: 외부에서 선언된 VkDescriptorSetLayoutBinding을 통해 초기화 해야함!
-	CreateDescriptorSet();
+}
 
+void L_Pass::CreatePipelineData()
+{
 	CreatePipelineLayout();
 	CreatePipeline();
 }
@@ -109,19 +112,8 @@ void L_Pass::CreateFrameBuffer()
 	VK_CHECK_RESULT(vkCreateFramebuffer(mApp->mVulkanDevice->logicalDevice, &fbufCreateInfo, nullptr, &mFrameBuffer));
 }
 
-void L_Pass::CreateDescriptorPool()
+void L_Pass::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize>& poolSizes)
 {
-	//L_Pass use position/normal/albedo textures and light data uniform.
-	VkDescriptorPoolSize Lightpoolsize{};
-	Lightpoolsize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	Lightpoolsize.descriptorCount = 2;//2 for point lights, look vec
-
-	VkDescriptorPoolSize GBufferAttachmentSize{};
-	GBufferAttachmentSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	GBufferAttachmentSize.descriptorCount = 3;//3 for albedo, normal, position
-
-	std::vector<VkDescriptorPoolSize> poolSizes = { Lightpoolsize, GBufferAttachmentSize };
-
 	VkDescriptorPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
@@ -157,7 +149,7 @@ void L_Pass::CreateDescriptorSet()
 
 void L_Pass::UpdateDescriptorSet(const std::vector<VkWriteDescriptorSet>& writeDescSets)
 {
-	//TODO: 외부에 저장된 data들을 가지고 와야함!
+	vkUpdateDescriptorSets(mApp->mVulkanDevice->logicalDevice, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
 }
 
 void L_Pass::CreatePipelineLayout()
