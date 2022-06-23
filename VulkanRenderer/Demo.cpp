@@ -213,12 +213,16 @@ void Demo::LoadMeshAndObjects()
 	BlueMesh = new Mesh;
 	BlueMesh->loadAndCreateMesh("../models/Torus.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
+	floor = new Mesh;
+	floor->loadAndCreateMesh("../models/Plane.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
+
 	Skybox = new Mesh;
 	Skybox->loadAndCreateMesh("../models/Skybox.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
 	objects.push_back(new Object(redMesh, glm::vec3(0.f, 0.f, 3.f)));
 	objects.push_back(new Object(greenMesh, glm::vec3(3.f, 0.f, 0.f)));
 	objects.push_back(new Object(BlueMesh, glm::vec3(-3.f, 0.f, 0.f)));
+	objects.push_back(new Object(floor, glm::vec3(0, -2.0, 0)));
 }
 
 void Demo::LoadCubemap(std::string filename, VkFormat format, bool forceLinearTiling)

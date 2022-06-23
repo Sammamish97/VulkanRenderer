@@ -74,6 +74,7 @@ private:
 	Mesh* redMesh;
 	Mesh* greenMesh;
 	Mesh* BlueMesh;
+	Mesh* floor;
 	std::vector<Object*> objects;
 
 	Mesh* Skybox;
