@@ -84,9 +84,6 @@
     <ClCompile Include="..\Include\imgui-master\imgui_tables.cpp">
       <Filter>IMGUI</Filter>
     </ClCompile>
-    <ClCompile Include="VulkanFrameBuffer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="ImageWrap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -116,6 +113,15 @@
     </ClCompile>
     <ClCompile Include="..\Include\ktx\lib\texture.c">
       <Filter>KTX</Filter>
+    </ClCompile>
+    <ClCompile Include="G_Pass.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="L_Pass.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="P_Pass.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -155,16 +161,13 @@
     <ClInclude Include="SwapChain.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="FrameBuffer.h">
+    <ClInclude Include="Attachment.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Shader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Demo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="VulkanFrameBuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ImageWrap.h">
@@ -177,6 +180,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PostFrameBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="G_Pass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="L_Pass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="P_Pass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

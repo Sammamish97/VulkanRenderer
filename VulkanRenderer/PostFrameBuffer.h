@@ -1,6 +1,6 @@
 #pragma once
 #include "vulkan/vulkan.h"
-#include "FrameBuffer.h"
+#include "Attachment.h"
 
 class VkApp;
 struct PostFrameBuffer

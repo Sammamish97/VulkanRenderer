@@ -4,7 +4,7 @@
 #include "Camera.h"
 #include "Object.h"
 #include "UniformStructure.h"
-#include "FrameBuffer.h"
+#include "Attachment.h"
 #include "ImageWrap.h"
 #include "GFrameBuffer.h"
 #include "LFrameBuffer.h"
@@ -85,7 +85,6 @@ private:
 //Texture
 	ImageWrap testImage;
 	ImageWrap testCubemap;
-	
 
 //FrameBuffer & Render related
 	Buffer textureUBO;

@@ -178,40 +178,44 @@
     <ClCompile Include="Demo.cpp" />
     <ClCompile Include="DirLight.cpp" />
     <ClCompile Include="GFrameBuffer.cpp" />
+    <ClCompile Include="G_Pass.cpp" />
     <ClCompile Include="ImageWrap.cpp" />
     <ClCompile Include="LFrameBuffer.cpp" />
+    <ClCompile Include="L_Pass.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="PointLight.cpp" />
     <ClCompile Include="PostFrameBuffer.cpp" />
+    <ClCompile Include="P_Pass.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="SwapChain.cpp" />
     <ClCompile Include="VkApp.cpp" />
     <ClCompile Include="VulkanBuffer.cpp" />
     <ClCompile Include="VulkanDevice.cpp" />
-    <ClCompile Include="VulkanFrameBuffer.cpp" />
     <ClCompile Include="VulkanTools.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Demo.h" />
     <ClInclude Include="DirLight.h" />
-    <ClInclude Include="FrameBuffer.h" />
+    <ClInclude Include="Attachment.h" />
     <ClInclude Include="GFrameBuffer.h" />
+    <ClInclude Include="G_Pass.h" />
     <ClInclude Include="ImageWrap.h" />
     <ClInclude Include="LFrameBuffer.h" />
+    <ClInclude Include="L_Pass.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="PointLight.h" />
     <ClInclude Include="PostFrameBuffer.h" />
+    <ClInclude Include="P_Pass.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="SwapChain.h" />
     <ClInclude Include="UniformStructure.h" />
     <ClInclude Include="VkApp.h" />
     <ClInclude Include="VulkanBuffer.h" />
     <ClInclude Include="VulkanDevice.h" />
-    <ClInclude Include="VulkanFrameBuffer.h" />
     <ClInclude Include="VulkanInitializers.hpp" />
     <ClInclude Include="VulkanTools.h" />
   </ItemGroup>
