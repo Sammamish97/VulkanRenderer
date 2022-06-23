@@ -9,10 +9,6 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
-    <Filter Include="Resource Files">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
     <Filter Include="Shaders">
       <UniqueIdentifier>{87447b96-6ba1-4c49-adc7-f2d18ba874a8}</UniqueIdentifier>
     </Filter>
@@ -21,6 +17,9 @@
     </Filter>
     <Filter Include="KTX">
       <UniqueIdentifier>{d62dab35-6613-436c-a43c-ab0aeb8d1615}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Pass">
+      <UniqueIdentifier>{56da616b-4b4b-431b-a654-1780a460cf22}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -106,13 +105,13 @@
       <Filter>KTX</Filter>
     </ClCompile>
     <ClCompile Include="G_Pass.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Pass</Filter>
     </ClCompile>
     <ClCompile Include="L_Pass.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Pass</Filter>
     </ClCompile>
     <ClCompile Include="P_Pass.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Pass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -165,13 +164,13 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="G_Pass.h">
-      <Filter>Header Files</Filter>
+      <Filter>Pass</Filter>
     </ClInclude>
     <ClInclude Include="L_Pass.h">
-      <Filter>Header Files</Filter>
+      <Filter>Pass</Filter>
     </ClInclude>
     <ClInclude Include="P_Pass.h">
-      <Filter>Header Files</Filter>
+      <Filter>Pass</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -194,6 +193,12 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="..\shaders\NormalDebug.geom">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\shaders\Skybox.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\shaders\Skybox.vert">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

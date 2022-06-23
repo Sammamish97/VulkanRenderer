@@ -14,19 +14,24 @@ public:
 
 	void CreateDescriptorPool(const std::vector<VkDescriptorPoolSize>& poolSizes);
 	void CreateDescriptorLayout(const std::vector<VkDescriptorSetLayoutBinding>& setLayoutBindings);
+	void CreateSkyDescriptorLayout(const std::vector<VkDescriptorSetLayoutBinding>& setLayoutBindings);
 	void CreateDescriptorSet();
+	void CreateSkyDescriptorSet();
 
 	void CreateFrameData();
 	void CreatePipelineData();
 
-	void UpdateDescriptorSet(const std::vector<VkWriteDescriptorSet>& writeDescSets);
-
+	void UpdateDescriptorSet(const std::vector<VkWriteDescriptorSet>& writeDescSets);//TODO: Why this function contained Pass? Update in the demo.
+	void UpdateSkyDescriptorSet(const std::vector<VkWriteDescriptorSet>& writeDescSets);
 private:
 	void CreateRenderPass();
 	void CreateFrameBuffer();
 
 	void CreatePipelineLayout();
 	void CreatePipeline();
+
+	void CreateSkyPipelineLayout();
+	void CreateSkyPipeline();
 
 public:
 	uint32_t mWidth, mHeight;
@@ -38,14 +43,19 @@ public:
 	FrameBufferAttachment* mGDepthResult;
 
 	VkDescriptorPool mDescriptorPool;
+
+	//Pipeline for draw Debug Normal
 	VkDescriptorSetLayout mDescriptorLayout;
 	VkDescriptorSet mDescriptorSet;
 
 	VkPipelineLayout mPipelineLayout;
 	VkPipeline mPipeline;
 
-	/*VkShaderModule mVertexShader;
-	VkShaderModule mGeometryShader;
-	VkShaderModule mFragmentShader;*/
+	//Pipeline for draw skybox
+	VkDescriptorSetLayout mSkyDescriptorLayout;
+	VkDescriptorSet mSkyDescriptorSet;
+
+	VkPipelineLayout mSkyPipelineLayout;
+	VkPipeline mSkyPipeline;
 };
 

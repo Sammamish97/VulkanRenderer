@@ -76,6 +76,8 @@ private:
 	Mesh* BlueMesh;
 	std::vector<Object*> objects;
 
+	Mesh* Skybox;
+
 	Camera* camera;
 	UniformBufferLights lightsData;
 	VkDescriptorPool descriptorPool;

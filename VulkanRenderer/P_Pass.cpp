@@ -21,13 +21,15 @@ void P_Pass::CreateFrameData()
 {
 	CreateRenderPass();
 	CreateFrameBuffer();
-
 }
 
 void P_Pass::CreatePipelineData()
 {
 	CreatePipelineLayout();
 	CreatePipeline();
+
+	CreateSkyPipelineLayout();
+	CreateSkyPipeline();
 }
 
 
@@ -135,8 +137,14 @@ void P_Pass::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize>& poolS
 
 void P_Pass::CreateDescriptorLayout(const std::vector<VkDescriptorSetLayoutBinding>& setLayoutBindings)
 {
-	VkDescriptorSetLayoutCreateInfo lightDescriptorLayout = initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mApp->mVulkanDevice->logicalDevice, &lightDescriptorLayout, nullptr, &mDescriptorLayout))
+	VkDescriptorSetLayoutCreateInfo DescriptorLayoutCI = initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mApp->mVulkanDevice->logicalDevice, &DescriptorLayoutCI, nullptr, &mDescriptorLayout))
+}
+
+void P_Pass::CreateSkyDescriptorLayout(const std::vector<VkDescriptorSetLayoutBinding>& setLayoutBindings)
+{
+	VkDescriptorSetLayoutCreateInfo DescriptorLayoutCI = initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
+	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mApp->mVulkanDevice->logicalDevice, &DescriptorLayoutCI, nullptr, &mSkyDescriptorLayout))
 }
 
 void P_Pass::CreateDescriptorSet()
@@ -153,7 +161,26 @@ void P_Pass::CreateDescriptorSet()
 	}
 }
 
+void P_Pass::CreateSkyDescriptorSet()
+{
+	VkDescriptorSetAllocateInfo setAllocInfo{};
+	setAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	setAllocInfo.descriptorPool = mDescriptorPool;
+	setAllocInfo.descriptorSetCount = 1;
+	setAllocInfo.pSetLayouts = &mSkyDescriptorLayout;
+
+	if (vkAllocateDescriptorSets(mApp->mVulkanDevice->logicalDevice, &setAllocInfo, &mSkyDescriptorSet) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to allocate descriptor sets");
+	}
+}
+
 void P_Pass::UpdateDescriptorSet(const std::vector<VkWriteDescriptorSet>& writeDescSets)
+{
+	vkUpdateDescriptorSets(mApp->mVulkanDevice->logicalDevice, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
+}
+
+void P_Pass::UpdateSkyDescriptorSet(const std::vector<VkWriteDescriptorSet>& writeDescSets)
 {
 	vkUpdateDescriptorSets(mApp->mVulkanDevice->logicalDevice, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
 }
@@ -170,6 +197,12 @@ void P_Pass::CreatePipelineLayout()
 	pipelinelayoutCI.pPushConstantRanges = &pushConstant;
 
 	VK_CHECK_RESULT(vkCreatePipelineLayout(mApp->mVulkanDevice->logicalDevice, &pipelinelayoutCI, nullptr, &mPipelineLayout))
+}
+
+void P_Pass::CreateSkyPipelineLayout()
+{
+	VkPipelineLayoutCreateInfo pipelinelayoutCI = initializers::pipelineLayoutCreateInfo(&mSkyDescriptorLayout, 1);
+	VK_CHECK_RESULT(vkCreatePipelineLayout(mApp->mVulkanDevice->logicalDevice, &pipelinelayoutCI, nullptr, &mSkyPipelineLayout))
 }
 
 void P_Pass::CreatePipeline()
@@ -227,6 +260,60 @@ void P_Pass::CreatePipeline()
 	//TODO: Maybe blend state is problem.
 	colorBlendState = initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
 	VK_CHECK_RESULT(vkCreateGraphicsPipelines(mApp->mVulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &mPipeline))
+}
+
+void P_Pass::CreateSkyPipeline()
+{
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
+		initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
+	VkPipelineRasterizationStateCreateInfo rasterizationState =
+		initializers::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+	VkPipelineColorBlendAttachmentState blendAttachmentState =
+		initializers::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
+	VkPipelineColorBlendStateCreateInfo colorBlendState =
+		initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
+	VkPipelineDepthStencilStateCreateInfo depthStencilState =
+		initializers::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+	VkPipelineViewportStateCreateInfo viewportState =
+		initializers::pipelineViewportStateCreateInfo(1, 1, 0);
+	VkPipelineMultisampleStateCreateInfo multisampleState =
+		initializers::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
+	std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	VkPipelineDynamicStateCreateInfo dynamicState =
+		initializers::pipelineDynamicStateCreateInfo(dynamicStateEnables);
+
+	std::array<VkPipelineShaderStageCreateInfo, 2> geometryShaderStages;
+	geometryShaderStages[0] = createShaderStageCreateInfo("../shaders/SkyboxVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mApp->mVulkanDevice->logicalDevice);
+	geometryShaderStages[1] = createShaderStageCreateInfo("../shaders/SkyboxFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mApp->mVulkanDevice->logicalDevice);
+
+	VkGraphicsPipelineCreateInfo pipelineCI = initializers::pipelineCreateInfo(mSkyPipelineLayout, mRenderPass);
+	pipelineCI.pInputAssemblyState = &inputAssemblyState;
+	pipelineCI.pRasterizationState = &rasterizationState;
+	pipelineCI.pColorBlendState = &colorBlendState;
+	pipelineCI.pMultisampleState = &multisampleState;
+	pipelineCI.pViewportState = &viewportState;
+	pipelineCI.pDepthStencilState = &depthStencilState;
+	pipelineCI.pDynamicState = &dynamicState;
+	pipelineCI.stageCount = static_cast<uint32_t>(geometryShaderStages.size());
+	pipelineCI.pStages = geometryShaderStages.data();
+	pipelineCI.renderPass = mRenderPass;
+
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+	auto bindingDescription = Vertex::getBindingDescription();
+	auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
+	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputInfo.vertexBindingDescriptionCount = 1;
+	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+	pipelineCI.pVertexInputState = &vertexInputInfo;
+	rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;//TODO: Maybe problem.
+
+	//TODO: Maybe blend state is problem.
+	colorBlendState = initializers::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(mApp->mVulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &mSkyPipeline))
 }
 
 void P_Pass::Update()

@@ -79,6 +79,7 @@ void Demo::Draw()
 	uint32_t imageindex;
 	VkResult result = vkAcquireNextImageKHR(mVulkanDevice->logicalDevice, mSwapChain->mSwapChain, UINT64_MAX, presentComplete, VK_NULL_HANDLE, &imageindex);
 
+	UpdateDescriptorSet();
 
 	BuildGCommandBuffer();
 	BuildLightCommandBuffer();//TODO: Can transfer to Init. Not draw.
@@ -96,7 +97,7 @@ void Demo::Draw()
 	}
 
 	UpdateUniformBuffer();
-	UpdateDescriptorSet();
+	
 
 	vkResetFences(mVulkanDevice->logicalDevice, 1, &inFlightFence);
 
@@ -207,11 +208,13 @@ void Demo::LoadMeshAndObjects()
 	redMesh->loadAndCreateMesh("../models/Sphere.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
 	greenMesh = new Mesh;
-	greenMesh->loadAndCreateMesh("../models/Plane.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));
+	greenMesh->loadAndCreateMesh("../models/Monkey.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
 	BlueMesh = new Mesh;
 	BlueMesh->loadAndCreateMesh("../models/Torus.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
+	Skybox = new Mesh;
+	Skybox->loadAndCreateMesh("../models/Skybox.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
 	objects.push_back(new Object(redMesh, glm::vec3(0.f, 0.f, 3.f)));
 	objects.push_back(new Object(greenMesh, glm::vec3(3.f, 0.f, 0.f)));
@@ -435,7 +438,6 @@ void Demo::CreateSyncObjects()
 	}
 }
 
-
 void Demo::CreateUniformBuffers()
 {
 	VkDeviceSize MatbufferSize = sizeof(UniformBufferMat);
@@ -504,9 +506,13 @@ void Demo::InitDescriptorPool()
 	ModelTexturesSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	ModelTexturesSize.descriptorCount = 1;//1 for diffuse
 
+	VkDescriptorPoolSize cubemapSize{};
+	cubemapSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	cubemapSize.descriptorCount = 1;//1 for cubemap
+
 	std::vector<VkDescriptorPoolSize> gPoolSizes = { matPoolsize, ModelTexturesSize };
 	std::vector<VkDescriptorPoolSize> lPoolSizes = { Lightpoolsize, GBufferAttachmentSize };
-	std::vector<VkDescriptorPoolSize> pPoolSizes = { matPoolsize };
+	std::vector<VkDescriptorPoolSize> pPoolSizes = { matPoolsize, cubemapSize };
 
 	geometry_pass.CreateDescriptorPool(gPoolSizes);
 	lighting_pass.CreateDescriptorPool(lPoolSizes);
@@ -559,6 +565,13 @@ void Demo::InitDescriptorLayout()
 	diffuseTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	diffuseTextureBinding.pImmutableSamplers = nullptr;
 
+	VkDescriptorSetLayoutBinding cubemapBinding{};
+	cubemapBinding.binding = 6;
+	cubemapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	cubemapBinding.descriptorCount = 1;
+	cubemapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	cubemapBinding.pImmutableSamplers = nullptr;
+
 	std::vector<VkDescriptorSetLayoutBinding> GLayoutBinding = { matLayoutBinding, diffuseTextureBinding };
 	geometry_pass.CreateDescriptorLayout(GLayoutBinding);
 
@@ -567,6 +580,9 @@ void Demo::InitDescriptorLayout()
 
 	std::vector<VkDescriptorSetLayoutBinding> PLayoutBindings = { matLayoutBinding };
 	post_pass.CreateDescriptorLayout(PLayoutBindings);
+
+	std::vector<VkDescriptorSetLayoutBinding> PSkyLayoutBindings = { matLayoutBinding, cubemapBinding };
+	post_pass.CreateSkyDescriptorLayout(PSkyLayoutBindings);
 }
 
 void Demo::InitDescriptorSet()
@@ -574,6 +590,7 @@ void Demo::InitDescriptorSet()
 	geometry_pass.CreateDescriptorSet();
 	lighting_pass.CreateDescriptorSet();
 	post_pass.CreateDescriptorSet();
+	post_pass.CreateSkyDescriptorSet();
 }
 
 void Demo::BuildLightCommandBuffer()
@@ -606,9 +623,6 @@ void Demo::BuildLightCommandBuffer()
 
 	vkCmdBindPipeline(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, lighting_pass.mPipeline);
 	vkCmdDraw(LightingCommandBuffer, 3, 1, 0, 0);
-
-	ImGui::Render();
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), LightingCommandBuffer);
 
 	vkCmdEndRenderPass(LightingCommandBuffer);
 
@@ -699,8 +713,8 @@ void Demo::BuildPostCommandBuffer(int swapChianIndex)
 	VkRect2D scissor = initializers::rect2D(post_pass.mWidth, post_pass.mHeight, 0, 0);
 	vkCmdSetScissor(PostCommandBuffer, 0, 1, &scissor);
 
+	//
 	vkCmdBindPipeline(PostCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_pass.mPipeline);
-
 	vkCmdBindDescriptorSets(PostCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_pass.mPipelineLayout, 0, 1, &post_pass.mDescriptorSet, 0, nullptr);
 
 	if (DrawNormal == true)
@@ -715,6 +729,17 @@ void Demo::BuildPostCommandBuffer(int swapChianIndex)
 			vkCmdDraw(PostCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
 		}
 	}
+	//
+
+
+	//
+	vkCmdBindPipeline(PostCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_pass.mSkyPipeline);
+	vkCmdBindDescriptorSets(PostCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, post_pass.mSkyPipelineLayout, 0, 1, &post_pass.mSkyDescriptorSet, 0, nullptr);
+	VkBuffer vertexBuffers[] = { Skybox->vertexBuffer };
+	VkDeviceSize offsets[] = { 0 };
+	vkCmdBindVertexBuffers(PostCommandBuffer, 0, 1, vertexBuffers, offsets);
+	vkCmdDraw(PostCommandBuffer, static_cast<uint32_t>(Skybox->vertices.size()), 1, 0, 0);
+	//
 
 	ImGui::Render();
 	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), PostCommandBuffer);
@@ -791,6 +816,11 @@ void Demo::UpdateDescriptorSet()
 	modelDiffuseDisc.imageView = testImage.imageView;
 	modelDiffuseDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+	VkDescriptorImageInfo cubemapDisc;
+	cubemapDisc.sampler = testCubemap.sampler;
+	cubemapDisc.imageView = testCubemap.imageView;
+	cubemapDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
 	std::vector<VkWriteDescriptorSet> GBufWriteDescriptorSets;
 	GBufWriteDescriptorSets = {
 		initializers::writeDescriptorSet(geometry_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &MatBufferInfo),
@@ -809,9 +839,18 @@ void Demo::UpdateDescriptorSet()
 	
 	std::vector<VkWriteDescriptorSet> PBufWriteDescriptorSets;
 	PBufWriteDescriptorSets = {
-		initializers::writeDescriptorSet(post_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &MatBufferInfo)
+		initializers::writeDescriptorSet(post_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &MatBufferInfo),
 	};
 	post_pass.UpdateDescriptorSet(PBufWriteDescriptorSets);
+
+	std::vector<VkWriteDescriptorSet> PSkyBufWriteDescriptorSets;
+	PSkyBufWriteDescriptorSets = {
+		initializers::writeDescriptorSet(post_pass.mSkyDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &MatBufferInfo),
+		initializers::writeDescriptorSet(post_pass.mSkyDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6, &cubemapDisc)
+	};
+	post_pass.UpdateSkyDescriptorSet(PSkyBufWriteDescriptorSets);
+	
+	//TODO: Update함수를 여기서 쓰는것이 더 좋아보인다.
 }
 
 void Demo::ProcessInput()

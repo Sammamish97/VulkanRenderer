@@ -221,6 +221,8 @@
     <None Include="..\shaders\Lighting.frag" />
     <None Include="..\shaders\Lighting.vert" />
     <None Include="..\shaders\NormalDebug.geom" />
+    <None Include="..\shaders\Skybox.frag" />
+    <None Include="..\shaders\Skybox.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
