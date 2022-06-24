@@ -185,7 +185,6 @@
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="PointLight.cpp" />
     <ClCompile Include="P_Pass.cpp" />
-    <ClCompile Include="Shader.cpp" />
     <ClCompile Include="SwapChain.cpp" />
     <ClCompile Include="S_Pass.cpp" />
     <ClCompile Include="VkApp.cpp" />
@@ -205,7 +204,6 @@
     <ClInclude Include="Object.h" />
     <ClInclude Include="PointLight.h" />
     <ClInclude Include="P_Pass.h" />
-    <ClInclude Include="Shader.h" />
     <ClInclude Include="SwapChain.h" />
     <ClInclude Include="S_Pass.h" />
     <ClInclude Include="UniformStructure.h" />

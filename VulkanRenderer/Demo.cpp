@@ -537,9 +537,13 @@ void Demo::InitDescriptorPool()
 	shadowMatSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	shadowMatSize.descriptorCount = 1;//1 for MVP matrix which already multiplied.
 
+	VkDescriptorPoolSize ShadowDepthTextureSize{};
+	ShadowDepthTextureSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	ShadowDepthTextureSize.descriptorCount = 1;//1 for depth
+
 	std::vector<VkDescriptorPoolSize> sPoolSizes = { shadowMatSize };
 	std::vector<VkDescriptorPoolSize> gPoolSizes = { matPoolsize, ModelTexturesSize };
-	std::vector<VkDescriptorPoolSize> lPoolSizes = { Lightpoolsize, GBufferAttachmentSize };
+	std::vector<VkDescriptorPoolSize> lPoolSizes = { Lightpoolsize, GBufferAttachmentSize, shadowMatSize, ShadowDepthTextureSize };
 	std::vector<VkDescriptorPoolSize> pPoolSizes = { matPoolsize, cubemapSize };
 	
 	shadow_pass.CreateDescriptorPool(sPoolSizes);
@@ -605,8 +609,15 @@ void Demo::InitDescriptorLayout()
 	lightMVPBinding.binding = 7;
 	lightMVPBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	lightMVPBinding.descriptorCount = 1;
-	lightMVPBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	lightMVPBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 	lightMVPBinding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutBinding shadowDepthbinding{};
+	shadowDepthbinding.binding = 8;
+	shadowDepthbinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	shadowDepthbinding.descriptorCount = 1;
+	shadowDepthbinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shadowDepthbinding.pImmutableSamplers = nullptr;
 
 	std::vector<VkDescriptorSetLayoutBinding> SLayoutBinding = { lightMVPBinding };
 	shadow_pass.CreateDescriptorLayout(SLayoutBinding);
@@ -614,7 +625,7 @@ void Demo::InitDescriptorLayout()
 	std::vector<VkDescriptorSetLayoutBinding> GLayoutBinding = { matLayoutBinding, diffuseTextureBinding };
 	geometry_pass.CreateDescriptorLayout(GLayoutBinding);
 
-	std::vector<VkDescriptorSetLayoutBinding> LLayoutBindings = { lightLayoutBinding, positionTextureBinding, normalTextureBinding, albedoTextureBinding };
+	std::vector<VkDescriptorSetLayoutBinding> LLayoutBindings = { lightLayoutBinding, positionTextureBinding, normalTextureBinding, albedoTextureBinding, lightMVPBinding, shadowDepthbinding };
 	lighting_pass.CreateDescriptorLayout(LLayoutBindings);
 
 	std::vector<VkDescriptorSetLayoutBinding> PLayoutBindings = { matLayoutBinding };
@@ -675,7 +686,7 @@ void Demo::BuildShadowCommandBuffer()
 		VkDeviceSize offsets[] = { 0 };
 		vkCmdBindVertexBuffers(ShadowCommandBuffer, 0, 1, vertexBuffers, offsets);
 		glm::mat4 modelMat = object->BuildModelMat();
-		vkCmdPushConstants(ShadowCommandBuffer, shadow_pass.mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(glm::mat4), &modelMat);
+		vkCmdPushConstants(ShadowCommandBuffer, shadow_pass.mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &modelMat);
 		vkCmdDraw(ShadowCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
 	}
 	vkCmdEndRenderPass(ShadowCommandBuffer);
@@ -862,8 +873,16 @@ void Demo::UpdateUniformBuffer()
 		lightsData.point_light[i].mPos = glm::vec3(radius * cos(rotateAmount + glm::radians(120.f * i)), 0.f, radius * sin(rotateAmount + glm::radians(120.f * i)));
 	}
 
+	glm::vec3 lightPos = lightsData.point_light[0].mPos * 3.f + glm::vec3(0, 5, 0);
+	glm::mat4 lightProjection, lightView, lightModel;
+	glm::mat4 lightSpaceMatrix;
+	float near_plane = 1.0f, far_plane = 96.5f;
+	lightProjection = glm::perspective(glm::radians(45.0f), WIDTH/static_cast<float>(HEIGHT), near_plane, far_plane);
+	lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+	lightSpaceMatrix = lightProjection * lightView;
+
 	//TODO: Add actual light pos and direction with light view & projection.
-	lightMatData.lightMVP = ubo.view * ubo.proj;
+	lightMatData.lightMVP = lightSpaceMatrix;
 
 	void* Matdata;
 	vkMapMemory(mVulkanDevice->logicalDevice, matUBO.memory, 0, sizeof(ubo), 0, &Matdata);
@@ -922,13 +941,12 @@ void Demo::UpdateDescriptorSet()
 	VkDescriptorBufferInfo LightMatBufferInfo{};
 	LightMatBufferInfo.buffer = lightMatUBO.buffer;
 	LightMatBufferInfo.offset = 0;
-	LightMatBufferInfo.range = sizeof(UniformBufferMat);
+	LightMatBufferInfo.range = sizeof(LightMatUBO);
 
-	std::vector<VkWriteDescriptorSet> SBufWriteDescriptorSets;
-	SBufWriteDescriptorSets = {
-		initializers::writeDescriptorSet(shadow_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &LightMatBufferInfo),
-	};
-	shadow_pass.UpdateDescriptorSet(SBufWriteDescriptorSets);
+	VkDescriptorImageInfo shadowDepthDisc{};
+	shadowDepthDisc.sampler = colorSampler;
+	shadowDepthDisc.imageView = shadow_pass.mDepth.view;
+	shadowDepthDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	std::vector<VkWriteDescriptorSet> GBufWriteDescriptorSets;
 	GBufWriteDescriptorSets = {
@@ -943,6 +961,8 @@ void Demo::UpdateDescriptorSet()
 		initializers::writeDescriptorSet(lighting_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &texPosDisc),
 		initializers::writeDescriptorSet(lighting_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &texNormalDisc),
 		initializers::writeDescriptorSet(lighting_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &texColorDisc),
+		initializers::writeDescriptorSet(lighting_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 7, &LightMatBufferInfo),
+		initializers::writeDescriptorSet(lighting_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8, &shadowDepthDisc)
 	};
 	lighting_pass.UpdateDescriptorSet(lightWriteDescriptorSets);
 	
@@ -959,12 +979,11 @@ void Demo::UpdateDescriptorSet()
 	};
 	post_pass.UpdateSkyDescriptorSet(PSkyBufWriteDescriptorSets);
 
-
-	std::vector<VkWriteDescriptorSet> ShadowWriteDescriptorSets;
-	ShadowWriteDescriptorSets = {
-		initializers::writeDescriptorSet(shadow_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 7, &LightMatBufferInfo)
+	std::vector<VkWriteDescriptorSet> SBufWriteDescriptorSets;
+	SBufWriteDescriptorSets = {
+		initializers::writeDescriptorSet(shadow_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 7, &LightMatBufferInfo),
 	};
-	shadow_pass.UpdateDescriptorSet(PSkyBufWriteDescriptorSets);
+	shadow_pass.UpdateDescriptorSet(SBufWriteDescriptorSets);
 	//TODO: Update함수를 여기서 쓰는것이 더 좋아보인다.
 }
 

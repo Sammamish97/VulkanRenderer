@@ -57,6 +57,7 @@ private:
 
 public:
 	void CreateAttachment(VkFormat format, VkImageUsageFlagBits usage, FrameBufferAttachment* attachment);
+	void CreateDepthOnlyAttachment(VkFormat format, FrameBufferAttachment* attachment);
 	VkFormat FindDepthFormat();
 	VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 

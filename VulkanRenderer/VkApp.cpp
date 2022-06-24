@@ -282,6 +282,57 @@ void VkApp::CreateAttachment(VkFormat format, VkImageUsageFlagBits usage, FrameB
 	VK_CHECK_RESULT(vkCreateImageView(mVulkanDevice->logicalDevice, &imageView, nullptr, &attachment->view));
 }
 
+void VkApp::CreateDepthOnlyAttachment(VkFormat format, FrameBufferAttachment* attachment)
+{
+	VkImageAspectFlags aspectMask = 0;
+	VkImageLayout imageLayout;
+
+	attachment->format = format;
+
+	aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	assert(aspectMask > 0);
+
+	VkImageCreateInfo image{};
+	image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	image.imageType = VK_IMAGE_TYPE_2D;
+	image.format = format;
+	image.extent.width = WIDTH;
+	image.extent.height = HEIGHT;
+	image.extent.depth = 1;
+	image.mipLevels = 1;
+	image.arrayLayers = 1;
+	image.samples = VK_SAMPLE_COUNT_1_BIT;
+	image.tiling = VK_IMAGE_TILING_OPTIMAL;
+	image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	image.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	VkMemoryAllocateInfo memAlloc{};
+	memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+
+	VkMemoryRequirements memReqs;
+
+	VK_CHECK_RESULT(vkCreateImage(mVulkanDevice->logicalDevice, &image, nullptr, &attachment->image));
+	vkGetImageMemoryRequirements(mVulkanDevice->logicalDevice, attachment->image, &memReqs);
+	memAlloc.allocationSize = memReqs.size;
+	memAlloc.memoryTypeIndex = mVulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	VK_CHECK_RESULT(vkAllocateMemory(mVulkanDevice->logicalDevice, &memAlloc, nullptr, &attachment->memory));
+	VK_CHECK_RESULT(vkBindImageMemory(mVulkanDevice->logicalDevice, attachment->image, attachment->memory, 0));
+
+	VkImageViewCreateInfo imageView = initializers::imageViewCreateInfo();
+	imageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	imageView.format = format;
+	imageView.subresourceRange = {};
+	imageView.subresourceRange.aspectMask = aspectMask;
+	imageView.subresourceRange.baseMipLevel = 0;
+	imageView.subresourceRange.levelCount = 1;
+	imageView.subresourceRange.baseArrayLayer = 0;
+	imageView.subresourceRange.layerCount = 1;
+	imageView.image = attachment->image;
+	VK_CHECK_RESULT(vkCreateImageView(mVulkanDevice->logicalDevice, &imageView, nullptr, &attachment->view));
+}
+
 VkFormat VkApp::FindDepthFormat()
 {
 	return FindSupportedFormat({ VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },

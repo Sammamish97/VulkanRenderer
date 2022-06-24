@@ -28,10 +28,8 @@ void S_Pass::CreatePipelineData()
 
 void S_Pass::CreateAttachment()
 {
-	VkFormat attDepthFormat = mApp->FindDepthFormat();
-
-	VkImageUsageFlagBits depthAttachUsage = static_cast<VkImageUsageFlagBits>(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-	mApp->CreateAttachment(attDepthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &mDepth);
+	//VkFormat attDepthFormat = mApp->FindDepthFormat();
+	mApp->CreateDepthOnlyAttachment(VK_FORMAT_D16_UNORM, &mDepth);
 }
 
 void S_Pass::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize>& poolSizes)

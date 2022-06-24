@@ -3,6 +3,7 @@
 layout (binding = 2) uniform sampler2D samplerposition;
 layout (binding = 3) uniform sampler2D samplerNormal;
 layout (binding = 4) uniform sampler2D samplerAlbedo;
+layout (binding = 8) uniform sampler2D shadowDepth;
 
 layout (location = 0) in vec2 inUV;
 
@@ -15,10 +16,32 @@ struct PointLight {
     float pad2;
 };
 
+layout (binding = 7) uniform LightMatUBO 
+{
+	mat4 lightMVP;
+} LightMat;
+
 layout (binding = 1) uniform PointLightsUBO {
     PointLight pointlights[3];
     vec3 lookvec;
 } pointLight;
+
+float ShadowCalc(vec4 lightSpaceFragPos)
+{
+    vec3 ProjCoord = lightSpaceFragPos.xyz / lightSpaceFragPos.w;
+    ProjCoord = ProjCoord * 0.5 + 0.5;
+    float closestDepth = texture(shadowDepth, ProjCoord.xy).r;
+    float currentDepth = ProjCoord.z;
+
+    if(closestDepth < currentDepth)
+    {
+        return 0.0f;
+    }
+    else
+    {
+        return 1.f;
+    }
+}
 
 void main() 
 {
@@ -26,12 +49,23 @@ void main()
 	vec3 fragPos = texture(samplerposition, inUV).rgb;
 	vec3 normal = texture(samplerNormal, inUV).rgb;
 	vec4 albedo = texture(samplerAlbedo, inUV);
-
 	vec3 norm_n = normalize(normal);
-    
+
+    // Shadow values
+    vec4 lightSpaceFragPos = LightMat.lightMVP * vec4(fragPos, 1.0);
+
+
+    //Light calculation
     vec3 result = vec3(0, 0, 0);
     
-    for(int i = 0; i < 3; ++i)
+    //Currently, Shadowing working on only first light
+    vec3 norm_l = normalize(pointLight.pointlights[0].pos - fragPos);
+    float diff = max(dot(norm_l, norm_n), 0.2f);
+    vec3 diffuse = diff * pointLight.pointlights[0].color;
+
+    result += (diffuse) * vec3(albedo) * ShadowCalc(lightSpaceFragPos);
+
+    for(int i = 1; i < 3; ++i)
     {
         vec3 norm_l = normalize(pointLight.pointlights[i].pos - fragPos);
         float diff = max(dot(norm_l, norm_n), 0.2f);

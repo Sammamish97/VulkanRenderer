@@ -1,6 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
 #include "PointLight.h"
+#include "DirLight.h"
 struct UniformBufferMat
 {
 	glm::mat4 view;
