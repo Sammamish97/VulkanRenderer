@@ -28,6 +28,7 @@ void Demo::Init()
 	CreateCamera();
 	CreateSyncObjects();
 
+	shadow_pass.Init(this, WIDTH, HEIGHT);
 	geometry_pass.Init(this, WIDTH, HEIGHT);
 	lighting_pass.Init(this, WIDTH, HEIGHT);
 	post_pass.Init(this, WIDTH, HEIGHT, &lighting_pass.mComposition, &geometry_pass.mDepth);
@@ -35,6 +36,9 @@ void Demo::Init()
 	InitDescriptorPool();
 	InitDescriptorLayout();
 	InitDescriptorSet();
+
+	shadow_pass.CreateFrameData();
+	shadow_pass.CreatePipelineData();
 
 	geometry_pass.CreateFrameData();
 	geometry_pass.CreatePipelineData();
@@ -80,10 +84,9 @@ void Demo::Draw()
 	VkResult result = vkAcquireNextImageKHR(mVulkanDevice->logicalDevice, mSwapChain->mSwapChain, UINT64_MAX, presentComplete, VK_NULL_HANDLE, &imageindex);
 
 	UpdateDescriptorSet();
-
+	BuildShadowCommandBuffer();
 	BuildGCommandBuffer();
 	BuildLightCommandBuffer();//TODO: Can transfer to Init. Not draw.
-	
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
 	{
@@ -97,15 +100,27 @@ void Demo::Draw()
 	}
 
 	UpdateUniformBuffer();
-	
 
 	vkResetFences(mVulkanDevice->logicalDevice, 1, &inFlightFence);
 
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 
+	VkSubmitInfo SSubmitInfo = {};
+	SSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	SSubmitInfo.pWaitSemaphores = &presentComplete;
+	SSubmitInfo.waitSemaphoreCount = 1;
+	SSubmitInfo.pSignalSemaphores = &ShadowComplete;
+	SSubmitInfo.signalSemaphoreCount = 1;
+	SSubmitInfo.commandBufferCount = 1;
+	SSubmitInfo.pCommandBuffers = &ShadowCommandBuffer;
+	SSubmitInfo.pWaitDstStageMask = waitStages;
+
+	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &SSubmitInfo, nullptr))
+
+
 	VkSubmitInfo GSubmitInfo = {};
 	GSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	GSubmitInfo.pWaitSemaphores = &presentComplete;
+	GSubmitInfo.pWaitSemaphores = &ShadowComplete;
 	GSubmitInfo.waitSemaphoreCount = 1;
 	GSubmitInfo.pSignalSemaphores = &GBufferComplete;
 	GSubmitInfo.signalSemaphoreCount = 1;
@@ -436,6 +451,7 @@ void Demo::CreateSyncObjects()
 		vkCreateSemaphore(mVulkanDevice->logicalDevice, &semaphoreInfo, nullptr, &renderComplete) != VK_SUCCESS ||
 		vkCreateSemaphore(mVulkanDevice->logicalDevice, &semaphoreInfo, nullptr, &presentComplete) != VK_SUCCESS ||
 		vkCreateSemaphore(mVulkanDevice->logicalDevice, &semaphoreInfo, nullptr, &PostComplete) != VK_SUCCESS ||
+		vkCreateSemaphore(mVulkanDevice->logicalDevice, &semaphoreInfo, nullptr, &ShadowComplete) != VK_SUCCESS ||
 		vkCreateFence(mVulkanDevice->logicalDevice, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to create semaphores!");
@@ -449,6 +465,9 @@ void Demo::CreateUniformBuffers()
 
 	VkDeviceSize LightbufferSize = sizeof(lightsData);
 	mVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &lightUBO, LightbufferSize);
+
+	VkDeviceSize LightMatSize = sizeof(LightMatUBO);
+	mVulkanDevice->createBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &lightMatUBO, LightMatSize);
 }
 
 void Demo::CreateSampler()
@@ -514,10 +533,16 @@ void Demo::InitDescriptorPool()
 	cubemapSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	cubemapSize.descriptorCount = 1;//1 for cubemap
 
+	VkDescriptorPoolSize shadowMatSize{};
+	shadowMatSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	shadowMatSize.descriptorCount = 1;//1 for MVP matrix which already multiplied.
+
+	std::vector<VkDescriptorPoolSize> sPoolSizes = { shadowMatSize };
 	std::vector<VkDescriptorPoolSize> gPoolSizes = { matPoolsize, ModelTexturesSize };
 	std::vector<VkDescriptorPoolSize> lPoolSizes = { Lightpoolsize, GBufferAttachmentSize };
 	std::vector<VkDescriptorPoolSize> pPoolSizes = { matPoolsize, cubemapSize };
-
+	
+	shadow_pass.CreateDescriptorPool(sPoolSizes);
 	geometry_pass.CreateDescriptorPool(gPoolSizes);
 	lighting_pass.CreateDescriptorPool(lPoolSizes);
 	post_pass.CreateDescriptorPool(pPoolSizes);
@@ -576,6 +601,16 @@ void Demo::InitDescriptorLayout()
 	cubemapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	cubemapBinding.pImmutableSamplers = nullptr;
 
+	VkDescriptorSetLayoutBinding lightMVPBinding{};
+	lightMVPBinding.binding = 7;
+	lightMVPBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	lightMVPBinding.descriptorCount = 1;
+	lightMVPBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	lightMVPBinding.pImmutableSamplers = nullptr;
+
+	std::vector<VkDescriptorSetLayoutBinding> SLayoutBinding = { lightMVPBinding };
+	shadow_pass.CreateDescriptorLayout(SLayoutBinding);
+
 	std::vector<VkDescriptorSetLayoutBinding> GLayoutBinding = { matLayoutBinding, diffuseTextureBinding };
 	geometry_pass.CreateDescriptorLayout(GLayoutBinding);
 
@@ -592,9 +627,117 @@ void Demo::InitDescriptorLayout()
 void Demo::InitDescriptorSet()
 {
 	geometry_pass.CreateDescriptorSet();
+
 	lighting_pass.CreateDescriptorSet();
+
 	post_pass.CreateDescriptorSet();
 	post_pass.CreateSkyDescriptorSet();
+
+	shadow_pass.CreateDescriptorSet();
+}
+
+void Demo::BuildShadowCommandBuffer()
+{
+	ShadowCommandBuffer = mVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
+
+	VkCommandBufferBeginInfo cmdBufInfo = initializers::commandBufferBeginInfo();
+
+	// Clear values for all attachments written in the fragment shader
+	std::array<VkClearValue, 1> clearValues;
+	clearValues[0].depthStencil = { 1.0f, 0 };
+
+
+	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
+	renderPassBeginInfo.renderPass = shadow_pass.mRenderPass;
+	renderPassBeginInfo.framebuffer = shadow_pass.mFrameBuffer;
+	renderPassBeginInfo.renderArea.extent.width = shadow_pass.mWidth;
+	renderPassBeginInfo.renderArea.extent.height = shadow_pass.mHeight;
+	renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+	renderPassBeginInfo.pClearValues = clearValues.data();
+
+	VK_CHECK_RESULT(vkBeginCommandBuffer(ShadowCommandBuffer, &cmdBufInfo))
+
+	vkCmdBeginRenderPass(ShadowCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+	VkViewport viewport = initializers::viewport((float)shadow_pass.mWidth, (float)shadow_pass.mHeight, 0.0f, 1.0f);
+	vkCmdSetViewport(ShadowCommandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor = initializers::rect2D(shadow_pass.mWidth, shadow_pass.mHeight, 0, 0);
+	vkCmdSetScissor(ShadowCommandBuffer, 0, 1, &scissor);
+
+	vkCmdBindPipeline(ShadowCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadow_pass.mPipeline);
+
+	vkCmdBindDescriptorSets(ShadowCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shadow_pass.mPipelineLayout, 0, 1, &shadow_pass.mDescriptorSet, 0, nullptr);
+
+	for (Object* object : objects)
+	{
+		VkBuffer vertexBuffers[] = { object->mMesh->vertexBuffer };
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(ShadowCommandBuffer, 0, 1, vertexBuffers, offsets);
+		glm::mat4 modelMat = object->BuildModelMat();
+		vkCmdPushConstants(ShadowCommandBuffer, shadow_pass.mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(glm::mat4), &modelMat);
+		vkCmdDraw(ShadowCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
+	}
+	vkCmdEndRenderPass(ShadowCommandBuffer);
+
+	VK_CHECK_RESULT(vkEndCommandBuffer(ShadowCommandBuffer));
+}
+
+void Demo::BuildGCommandBuffer()
+{
+	GCommandBuffer = mVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
+
+	VkCommandBufferBeginInfo cmdBufInfo = initializers::commandBufferBeginInfo();
+
+	// Clear values for all attachments written in the fragment shader
+	std::array<VkClearValue, 4> clearValues;
+	clearValues[0].color = { { 0.0f, 0.0f, 0.0f, 0.0f } };
+	clearValues[1].color = { { 0.0f, 0.0f, 0.0f, 0.0f } };
+	clearValues[2].color = { { 0.0f, 0.0f, 0.0f, 0.0f } };
+	clearValues[3].depthStencil = { 1.0f, 0 };
+
+	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
+	renderPassBeginInfo.renderPass = geometry_pass.mRenderPass;
+	renderPassBeginInfo.framebuffer = geometry_pass.mFrameBuffer;
+	renderPassBeginInfo.renderArea.extent.width = geometry_pass.mWidth;
+	renderPassBeginInfo.renderArea.extent.height = geometry_pass.mHeight;
+	renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+	renderPassBeginInfo.pClearValues = clearValues.data();
+
+	VK_CHECK_RESULT(vkBeginCommandBuffer(GCommandBuffer, &cmdBufInfo))
+
+		vkCmdBeginRenderPass(GCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+	VkViewport viewport = initializers::viewport((float)geometry_pass.mWidth, (float)geometry_pass.mHeight, 0.0f, 1.0f);
+	vkCmdSetViewport(GCommandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor = initializers::rect2D(geometry_pass.mWidth, geometry_pass.mHeight, 0, 0);
+	vkCmdSetScissor(GCommandBuffer, 0, 1, &scissor);
+
+	vkCmdBindPipeline(GCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, geometry_pass.mPipeline);
+
+	vkCmdBindDescriptorSets(GCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, geometry_pass.mPipelineLayout, 0, 1, &geometry_pass.mDescriptorSet, 0, nullptr);
+
+	int accumulatingVertices = 0;
+	int accumulatingFaces = 0;
+	for (Object* object : objects)
+	{
+		accumulatingVertices += object->mMesh->vertexNum;
+		accumulatingFaces += object->mMesh->faceNum;
+
+		VkBuffer vertexBuffers[] = { object->mMesh->vertexBuffer };
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(GCommandBuffer, 0, 1, vertexBuffers, offsets);
+		glm::mat4 modelMat = object->BuildModelMat();
+		vkCmdPushConstants(GCommandBuffer, geometry_pass.mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(glm::mat4), &modelMat);
+		vkCmdDraw(GCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
+	}
+	totalVertices = accumulatingVertices;
+	totalFaces = accumulatingFaces;
+
+	vkCmdEndRenderPass(GCommandBuffer);
+
+	VK_CHECK_RESULT(vkEndCommandBuffer(GCommandBuffer));
 }
 
 void Demo::BuildLightCommandBuffer()
@@ -631,63 +774,6 @@ void Demo::BuildLightCommandBuffer()
 	vkCmdEndRenderPass(LightingCommandBuffer);
 
 	VK_CHECK_RESULT(vkEndCommandBuffer(LightingCommandBuffer));
-}
-
-void Demo::BuildGCommandBuffer()
-{
-	GCommandBuffer = mVulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
-
-	VkCommandBufferBeginInfo cmdBufInfo = initializers::commandBufferBeginInfo();
-
-	// Clear values for all attachments written in the fragment shader
-	std::array<VkClearValue, 4> clearValues;
-	clearValues[0].color = { { 0.0f, 0.0f, 0.0f, 0.0f } };
-	clearValues[1].color = { { 0.0f, 0.0f, 0.0f, 0.0f } };
-	clearValues[2].color = { { 0.0f, 0.0f, 0.0f, 0.0f } };
-	clearValues[3].depthStencil = { 1.0f, 0 };
-
-	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
-	renderPassBeginInfo.renderPass = geometry_pass.mRenderPass;
-	renderPassBeginInfo.framebuffer = geometry_pass.mFrameBuffer;
-	renderPassBeginInfo.renderArea.extent.width = geometry_pass.mWidth;
-	renderPassBeginInfo.renderArea.extent.height = geometry_pass.mHeight;
-	renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-	renderPassBeginInfo.pClearValues = clearValues.data();
-
-	VK_CHECK_RESULT(vkBeginCommandBuffer(GCommandBuffer, &cmdBufInfo))
-
-	vkCmdBeginRenderPass(GCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-	VkViewport viewport = initializers::viewport((float)geometry_pass.mWidth, (float)geometry_pass.mHeight, 0.0f, 1.0f);
-	vkCmdSetViewport(GCommandBuffer, 0, 1, &viewport);
-
-	VkRect2D scissor = initializers::rect2D(geometry_pass.mWidth, geometry_pass.mHeight, 0, 0);
-	vkCmdSetScissor(GCommandBuffer, 0, 1, &scissor);
-
-	vkCmdBindPipeline(GCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, geometry_pass.mPipeline);
-
-	vkCmdBindDescriptorSets(GCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, geometry_pass.mPipelineLayout, 0, 1, &geometry_pass.mDescriptorSet, 0, nullptr);
-
-	int accumulatingVertices = 0;
-	int accumulatingFaces = 0;
-	for (Object* object : objects)
-	{
-		accumulatingVertices += object->mMesh->vertexNum;
-		accumulatingFaces += object->mMesh->faceNum;
-
-		VkBuffer vertexBuffers[] = { object->mMesh->vertexBuffer };
-		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(GCommandBuffer, 0, 1, vertexBuffers, offsets);
-		glm::mat4 modelMat = object->BuildModelMat();
-		vkCmdPushConstants(GCommandBuffer, geometry_pass.mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT, 0, sizeof(glm::mat4), &modelMat);
-		vkCmdDraw(GCommandBuffer, static_cast<uint32_t>(object->mMesh->vertices.size()), 1, 0, 0);
-	}
-	totalVertices = accumulatingVertices;
-	totalFaces = accumulatingFaces; 
-
-	vkCmdEndRenderPass(GCommandBuffer);
-
-	VK_CHECK_RESULT(vkEndCommandBuffer(GCommandBuffer));
 }
 
 void Demo::BuildPostCommandBuffer(int swapChianIndex)
@@ -776,6 +862,9 @@ void Demo::UpdateUniformBuffer()
 		lightsData.point_light[i].mPos = glm::vec3(radius * cos(rotateAmount + glm::radians(120.f * i)), 0.f, radius * sin(rotateAmount + glm::radians(120.f * i)));
 	}
 
+	//TODO: Add actual light pos and direction with light view & projection.
+	lightMatData.lightMVP = ubo.view * ubo.proj;
+
 	void* Matdata;
 	vkMapMemory(mVulkanDevice->logicalDevice, matUBO.memory, 0, sizeof(ubo), 0, &Matdata);
 	memcpy(Matdata, &ubo, sizeof(ubo));
@@ -786,6 +875,11 @@ void Demo::UpdateUniformBuffer()
 	vkMapMemory(mVulkanDevice->logicalDevice, lightUBO.memory, 0, sizeof(UniformBufferLights), 0, &Lightdata);
 	memcpy(Lightdata, &lightsData, sizeof(lightsData));
 	vkUnmapMemory(mVulkanDevice->logicalDevice, lightUBO.memory);
+
+	void* LightMVP;
+	vkMapMemory(mVulkanDevice->logicalDevice, lightMatUBO.memory, 0, sizeof(LightMatUBO), 0, &LightMVP);
+	memcpy(LightMVP, &lightMatData, sizeof(lightMatData));
+	vkUnmapMemory(mVulkanDevice->logicalDevice, lightMatUBO.memory);
 }
 
 void Demo::UpdateDescriptorSet()
@@ -825,6 +919,17 @@ void Demo::UpdateDescriptorSet()
 	cubemapDisc.imageView = testCubemap.imageView;
 	cubemapDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+	VkDescriptorBufferInfo LightMatBufferInfo{};
+	LightMatBufferInfo.buffer = lightMatUBO.buffer;
+	LightMatBufferInfo.offset = 0;
+	LightMatBufferInfo.range = sizeof(UniformBufferMat);
+
+	std::vector<VkWriteDescriptorSet> SBufWriteDescriptorSets;
+	SBufWriteDescriptorSets = {
+		initializers::writeDescriptorSet(shadow_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &LightMatBufferInfo),
+	};
+	shadow_pass.UpdateDescriptorSet(SBufWriteDescriptorSets);
+
 	std::vector<VkWriteDescriptorSet> GBufWriteDescriptorSets;
 	GBufWriteDescriptorSets = {
 		initializers::writeDescriptorSet(geometry_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &MatBufferInfo),
@@ -853,7 +958,13 @@ void Demo::UpdateDescriptorSet()
 		initializers::writeDescriptorSet(post_pass.mSkyDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6, &cubemapDisc)
 	};
 	post_pass.UpdateSkyDescriptorSet(PSkyBufWriteDescriptorSets);
-	
+
+
+	std::vector<VkWriteDescriptorSet> ShadowWriteDescriptorSets;
+	ShadowWriteDescriptorSets = {
+		initializers::writeDescriptorSet(shadow_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 7, &LightMatBufferInfo)
+	};
+	shadow_pass.UpdateDescriptorSet(PSkyBufWriteDescriptorSets);
 	//TODO: Update함수를 여기서 쓰는것이 더 좋아보인다.
 }
 

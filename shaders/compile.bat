@@ -12,4 +12,7 @@ C:/VulkanSDK/1.3.211.0/Bin/glslc.exe NormalDebug.geom -o NormalDebug.spv
 C:/VulkanSDK/1.3.211.0/Bin/glslc.exe Skybox.vert -o SkyboxVert.spv
 C:/VulkanSDK/1.3.211.0/Bin/glslc.exe Skybox.frag -o SkyboxFrag.spv
 
+C:/VulkanSDK/1.3.211.0/Bin/glslc.exe Shadow.vert -o ShadowVert.spv
+C:/VulkanSDK/1.3.211.0/Bin/glslc.exe Shadow.frag -o ShadowFrag.spv
+
 pause

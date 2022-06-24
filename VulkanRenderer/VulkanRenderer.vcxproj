@@ -187,6 +187,7 @@
     <ClCompile Include="P_Pass.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="SwapChain.cpp" />
+    <ClCompile Include="S_Pass.cpp" />
     <ClCompile Include="VkApp.cpp" />
     <ClCompile Include="VulkanBuffer.cpp" />
     <ClCompile Include="VulkanDevice.cpp" />
@@ -206,6 +207,7 @@
     <ClInclude Include="P_Pass.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="SwapChain.h" />
+    <ClInclude Include="S_Pass.h" />
     <ClInclude Include="UniformStructure.h" />
     <ClInclude Include="VkApp.h" />
     <ClInclude Include="VulkanBuffer.h" />
@@ -221,6 +223,8 @@
     <None Include="..\shaders\Lighting.frag" />
     <None Include="..\shaders\Lighting.vert" />
     <None Include="..\shaders\NormalDebug.geom" />
+    <None Include="..\shaders\Shadow.frag" />
+    <None Include="..\shaders\Shadow.vert" />
     <None Include="..\shaders\Skybox.frag" />
     <None Include="..\shaders\Skybox.vert" />
   </ItemGroup>

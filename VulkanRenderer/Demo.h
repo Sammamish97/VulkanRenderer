@@ -5,6 +5,7 @@
 #include "Object.h"
 #include "UniformStructure.h"
 #include "ImageWrap.h"
+#include "S_Pass.h"
 #include "G_Pass.h"
 #include "L_Pass.h"
 #include "P_Pass.h"
@@ -50,8 +51,9 @@ private:
 
 	void CreateCommandBuffers();
 
-	void BuildLightCommandBuffer();
+	void BuildShadowCommandBuffer();
 	void BuildGCommandBuffer();
+	void BuildLightCommandBuffer();
 	void BuildPostCommandBuffer(int swapChianIndex);
 
 private:
@@ -81,6 +83,7 @@ private:
 
 	Camera* camera;
 	UniformBufferLights lightsData;
+	LightMatUBO lightMatData;
 	VkDescriptorPool descriptorPool;
 	VkSampler colorSampler;
 
@@ -92,16 +95,20 @@ private:
 	Buffer textureUBO;
 	Buffer matUBO;
 	Buffer lightUBO;
+	Buffer lightMatUBO;
 
+	S_Pass shadow_pass;
 	G_Pass geometry_pass;
 	L_Pass lighting_pass;
 	P_Pass post_pass;
-	
+
+	VkCommandBuffer ShadowCommandBuffer;
 	VkCommandBuffer GCommandBuffer;
 	VkCommandBuffer LightingCommandBuffer;
 	VkCommandBuffer PostCommandBuffer;
 
 //Synchronize
+	VkSemaphore ShadowComplete;
 	VkSemaphore GBufferComplete;
 	VkSemaphore renderComplete;
 	VkSemaphore PostComplete;
