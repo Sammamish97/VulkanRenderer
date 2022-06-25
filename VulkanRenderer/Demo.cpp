@@ -83,6 +83,7 @@ void Demo::Draw()
 	uint32_t imageindex;
 	VkResult result = vkAcquireNextImageKHR(mVulkanDevice->logicalDevice, mSwapChain->mSwapChain, UINT64_MAX, presentComplete, VK_NULL_HANDLE, &imageindex);
 
+	UpdateUniformBuffer();
 	UpdateDescriptorSet();
 	BuildShadowCommandBuffer();
 	BuildGCommandBuffer();
@@ -98,8 +99,6 @@ void Demo::Draw()
 	{
 		throw std::runtime_error("failed to acquire swap chain image!");
 	}
-
-	UpdateUniformBuffer();
 
 	vkResetFences(mVulkanDevice->logicalDevice, 1, &inFlightFence);
 
