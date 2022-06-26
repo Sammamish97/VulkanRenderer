@@ -26,16 +26,30 @@ layout (binding = 1) uniform PointLightsUBO {
     vec3 lookvec;
 } pointLight;
 
-float ShadowCalc(vec4 lightSpaceFragPos)
+float ShadowCalc(vec4 shadowCoord)
 {
+/*
     vec3 ProjCoord = lightSpaceFragPos.xyz / lightSpaceFragPos.w;
+    float currentDepth = ProjCoord.z;
     ProjCoord = ProjCoord * 0.5 + 0.5;
     float closestDepth = texture(shadowDepth, ProjCoord.xy).r;
-    float currentDepth = ProjCoord.z;
     
     float bias = 0.005;
-    float shadow = (currentDepth - bias) >= closestDepth ? 1.0 : 0.0;
+    float shadow = (currentDepth + bias) > closestDepth ? 1.0 : 0.0;
     return shadow;
+    */
+    
+    float shadow = 1.0;
+    vec2 uv = vec2(shadowCoord.x, -shadowCoord.y);
+	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 ) 
+	{
+		float dist = texture( shadowDepth, uv).r;
+		if ( shadowCoord.w > 0.0 && dist < shadowCoord.z ) 
+		{
+			shadow = 0.0;
+		}
+	}
+	return shadow;
 }
 
 void main() 
@@ -48,7 +62,7 @@ void main()
 
     // Shadow values
     vec4 lightSpaceFragPos = LightMat.lightMVP * vec4(fragPos, 1.0);
-    float shadow = ShadowCalc(lightSpaceFragPos);
+    float shadow = ShadowCalc(lightSpaceFragPos / lightSpaceFragPos.w);
 
     //Light calculation
     vec3 result = vec3(0, 0, 0);
@@ -57,7 +71,7 @@ void main()
     vec3 norm_l = normalize(pointLight.pointlights[0].pos - fragPos);
     float diff = max(dot(norm_l, norm_n), 0.2f);
     vec3 diffuse = diff * pointLight.pointlights[0].color;
-    result += (diffuse) * vec3(albedo) * (1.0 - shadow);
+    result += (diffuse) * vec3(albedo) * (shadow);
 
     for(int i = 1; i < 3; ++i)
     {

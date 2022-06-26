@@ -46,6 +46,7 @@ private:
 	void UpdateDescriptorSet();
 
 	void CreateSampler();
+	void CreateShadowDepthSampler();
 
 	void CreateUniformBuffers();
 
@@ -85,8 +86,9 @@ private:
 	UniformBufferLights lightsData;
 	LightMatUBO lightMatData;
 	VkDescriptorPool descriptorPool;
-	VkSampler colorSampler;
 
+	VkSampler colorSampler;
+	VkSampler shadowDepthSampler;
 //Texture
 	ImageWrap testImage;
 	ImageWrap testCubemap;

@@ -64,5 +64,14 @@ void Camera::updateCameraVectors()
 	front = glm::normalize(newFront);
 	// also re-calculate the Right and Up vector
 	right = glm::normalize(glm::cross(front, worldUp));  // normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
-	up = glm::normalize(glm::cross(right, front));
+
+	glm::vec3 temp_up = glm::normalize(glm::cross(front, right));
+	if(temp_up.y < 0.f)
+	{
+		up = -temp_up;
+	}
+	else
+	{
+		up = temp_up;
+	}
 }

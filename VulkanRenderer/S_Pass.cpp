@@ -201,6 +201,9 @@ void S_Pass::CreatePipeline()
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 	auto bindingDescription = Vertex::getBindingDescription();
 	auto attributeDescriptions = Vertex::getAttributeDescriptions();
+	
+	shaderStages[0] = createShaderStageCreateInfo("../shaders/ShadowVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mApp->mVulkanDevice->logicalDevice);
+	shaderStages[1] = createShaderStageCreateInfo("../shaders/ShadowFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mApp->mVulkanDevice->logicalDevice);
 
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertexInputInfo.vertexBindingDescriptionCount = 1;
@@ -208,11 +211,9 @@ void S_Pass::CreatePipeline()
 	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
 	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 	pipelineCI.pVertexInputState = &vertexInputInfo;
-	rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
 
-	shaderStages[0] = createShaderStageCreateInfo("../shaders/ShadowVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mApp->mVulkanDevice->logicalDevice);
-	shaderStages[1] = createShaderStageCreateInfo("../shaders/ShadowFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mApp->mVulkanDevice->logicalDevice);
 
+	
 	VK_CHECK_RESULT(vkCreateGraphicsPipelines(mApp->mVulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &mPipeline))
 }
 

@@ -51,6 +51,7 @@ void Demo::Init()
 
 	CreateUniformBuffers();
 	CreateSampler();
+	CreateShadowDepthSampler();
 	CreateCommandBuffers();
 
 	InitGUI();
@@ -218,14 +219,14 @@ void Demo::MouseCallBack(GLFWwindow* window, double xposIn, double yposIn)
 
 void Demo::LoadMeshAndObjects()
 {
-	redMesh = new Mesh;
-	redMesh->loadAndCreateMesh("../models/Sphere.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));
+	/*redMesh = new Mesh;
+	redMesh->loadAndCreateMesh("../models/Sphere.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));*/
 
-	greenMesh = new Mesh;
-	greenMesh->loadAndCreateMesh("../models/Monkey.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));
+	//greenMesh = new Mesh;
+	//greenMesh->loadAndCreateMesh("../models/Monkey.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
-	BlueMesh = new Mesh;
-	BlueMesh->loadAndCreateMesh("../models/Torus.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
+	//BlueMesh = new Mesh;
+	//BlueMesh->loadAndCreateMesh("../models/Torus.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
 	floor = new Mesh;
 	floor->loadAndCreateMesh("../models/Plane.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
@@ -233,10 +234,10 @@ void Demo::LoadMeshAndObjects()
 	Skybox = new Mesh;
 	Skybox->loadAndCreateMesh("../models/Skybox.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
-	objects.push_back(new Object(redMesh, glm::vec3(0.f, 0.f, 3.f)));
-	objects.push_back(new Object(greenMesh, glm::vec3(3.f, 0.f, 0.f)));
-	objects.push_back(new Object(BlueMesh, glm::vec3(-3.f, 0.f, 0.f)));
-	objects.push_back(new Object(floor, glm::vec3(0, -2.0, 0)));
+	//objects.push_back(new Object(redMesh, glm::vec3(0.f, 0.f, 3.f)));
+	//objects.push_back(new Object(greenMesh, glm::vec3(3.f, 0.f, 0.f)));
+	//objects.push_back(new Object(BlueMesh, glm::vec3(-3.f, 0.f, 0.f)));
+	objects.push_back(new Object(floor, glm::vec3(0, 0.0, 0)));
 }
 
 void Demo::LoadCubemap(std::string filename, VkFormat format, bool forceLinearTiling)
@@ -484,6 +485,23 @@ void Demo::CreateSampler()
 	sampler.maxLod = 1.0f;
 	sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 	VK_CHECK_RESULT(vkCreateSampler(mVulkanDevice->logicalDevice, &sampler, nullptr, &colorSampler));
+}
+
+void Demo::CreateShadowDepthSampler()
+{
+	VkSamplerCreateInfo sampler = initializers::samplerCreateInfo();
+	sampler.magFilter = VK_FILTER_NEAREST;
+	sampler.minFilter = VK_FILTER_NEAREST;
+	sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+	sampler.mipLodBias = 0.0f;
+	sampler.maxAnisotropy = 1.0f;
+	sampler.minLod = 0.0f;
+	sampler.maxLod = 1.0f;
+	VK_CHECK_RESULT(vkCreateSampler(mVulkanDevice->logicalDevice, &sampler, nullptr, &shadowDepthSampler));
 }
 
 void Demo::CreateCommandBuffers()
@@ -858,7 +876,7 @@ void Demo::UpdateUniformBuffer()
 
 	UniformBufferMat ubo{};
 	ubo.view = camera->getViewMatrix();
-	ubo.proj = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 0.1f, 100.f);
+	ubo.proj = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 0.1f, 1000.f);
 	ubo.proj[1][1] *= -1;
 
 	float radius = 5.f;
@@ -872,17 +890,15 @@ void Demo::UpdateUniformBuffer()
 		lightsData.point_light[i].mPos = glm::vec3(radius * cos(rotateAmount + glm::radians(120.f * i)), 0.f, radius * sin(rotateAmount + glm::radians(120.f * i)));
 	}
 
-	glm::vec3 lightPos = lightsData.point_light[0].mPos * 3.f + glm::vec3(0, 5, 0);
-	glm::mat4 lightProjection, lightView, lightModel;
-	glm::mat4 lightSpaceMatrix;
-	float near_plane = 1.0f, far_plane = 96.5f;
-	lightProjection = glm::perspective(glm::radians(45.0f), WIDTH/static_cast<float>(HEIGHT), near_plane, far_plane);
-	lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
-	lightSpaceMatrix = lightProjection * lightView;
+	//Calculate shadowing view & projection mat
+	glm::vec3 lightPos = glm::vec3(40.f, 50.f, 25.f);
+	glm::mat4 lightProjection = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 1.f, 96.f);
+	//glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.f, 100.f);
+	lightProjection[1][1] *= -1;
+	glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+	lightMatData.lightMVP = lightProjection * lightView;
 
-	//TODO: Add actual light pos and direction with light view & projection.
-	lightMatData.lightMVP = lightSpaceMatrix;
-
+	//Update data
 	void* Matdata;
 	vkMapMemory(mVulkanDevice->logicalDevice, matUBO.memory, 0, sizeof(ubo), 0, &Matdata);
 	memcpy(Matdata, &ubo, sizeof(ubo));
@@ -943,7 +959,7 @@ void Demo::UpdateDescriptorSet()
 	LightMatBufferInfo.range = sizeof(LightMatUBO);
 
 	VkDescriptorImageInfo shadowDepthDisc{};
-	shadowDepthDisc.sampler = colorSampler;
+	shadowDepthDisc.sampler = shadowDepthSampler; //TODO: 여길 바꿔야함!
 	shadowDepthDisc.imageView = shadow_pass.mDepth.view;
 	shadowDepthDisc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
