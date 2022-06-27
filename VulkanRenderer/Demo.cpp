@@ -219,14 +219,14 @@ void Demo::MouseCallBack(GLFWwindow* window, double xposIn, double yposIn)
 
 void Demo::LoadMeshAndObjects()
 {
-	/*redMesh = new Mesh;
-	redMesh->loadAndCreateMesh("../models/Sphere.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));*/
+	redMesh = new Mesh;
+	redMesh->loadAndCreateMesh("../models/Sphere.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
-	//greenMesh = new Mesh;
-	//greenMesh->loadAndCreateMesh("../models/Monkey.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));
+	greenMesh = new Mesh;
+	greenMesh->loadAndCreateMesh("../models/Monkey.obj", mVulkanDevice, glm::vec3(0.5, 0.5, 0.5));
 
-	//BlueMesh = new Mesh;
-	//BlueMesh->loadAndCreateMesh("../models/Torus.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
+	BlueMesh = new Mesh;
+	BlueMesh->loadAndCreateMesh("../models/Torus.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
 	floor = new Mesh;
 	floor->loadAndCreateMesh("../models/Plane.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
@@ -234,9 +234,10 @@ void Demo::LoadMeshAndObjects()
 	Skybox = new Mesh;
 	Skybox->loadAndCreateMesh("../models/Skybox.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
-	//objects.push_back(new Object(redMesh, glm::vec3(0.f, 0.f, 3.f)));
-	//objects.push_back(new Object(greenMesh, glm::vec3(3.f, 0.f, 0.f)));
-	//objects.push_back(new Object(BlueMesh, glm::vec3(-3.f, 0.f, 0.f)));
+	/*objects.push_back(new Object(redMesh, glm::vec3(0.f, 3.f, 3.f)));
+	objects.push_back(new Object(greenMesh, glm::vec3(3.f, 3.f, 0.f)));
+	objects.push_back(new Object(BlueMesh, glm::vec3(-3.f, 3.f, 0.f)));*/
+	objects.push_back(new Object(greenMesh, glm::vec3(0.f, 3.f, 0.f)));
 	objects.push_back(new Object(floor, glm::vec3(0, 0.0, 0)));
 }
 
@@ -876,7 +877,7 @@ void Demo::UpdateUniformBuffer()
 
 	UniformBufferMat ubo{};
 	ubo.view = camera->getViewMatrix();
-	ubo.proj = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 0.1f, 1000.f);
+	ubo.proj = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 0.1f, 500.f);
 	ubo.proj[1][1] *= -1;
 
 	float radius = 5.f;
@@ -887,11 +888,11 @@ void Demo::UpdateUniformBuffer()
 	}
 	for (int i = 0; i < 3; ++i)
 	{
-		lightsData.point_light[i].mPos = glm::vec3(radius * cos(rotateAmount + glm::radians(120.f * i)), 0.f, radius * sin(rotateAmount + glm::radians(120.f * i)));
+		lightsData.point_light[i].mPos = glm::vec3(radius * cos(rotateAmount + glm::radians(120.f * i)), 5.f, radius * sin(rotateAmount + glm::radians(120.f * i)));
 	}
 
 	//Calculate shadowing view & projection mat
-	glm::vec3 lightPos = glm::vec3(40.f, 50.f, 25.f);
+	glm::vec3 lightPos = lightsData.point_light[0].mPos + glm::vec3(0.f, 5.f, 0.f);
 	glm::mat4 lightProjection = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 1.f, 96.f);
 	//glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.f, 100.f);
 	lightProjection[1][1] *= -1;
