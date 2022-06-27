@@ -26,6 +26,7 @@ void Demo::Init()
 	CreateLight();
 	LoadCubemap("../textures/cubemap_yokohama_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, false);
 	CreateCamera();
+	CreateViewport();
 	CreateSyncObjects();
 
 	shadow_pass.Init(this, WIDTH, HEIGHT);
@@ -439,6 +440,15 @@ void Demo::CreateCamera()
 	camera = new Camera(glm::vec3(0, 0, 5), glm::vec3(0, 1, 0));
 }
 
+void Demo::CreateViewport()
+{
+	float width = (float)mSwapChain->mSwapChainExtent.width;
+	float height = (float)mSwapChain->mSwapChainExtent.height;
+	commonViewport = initializers::viewport(width, -height, 0.0f, 1.0f);
+	commonViewport.x = 0;
+	commonViewport.y = height;
+}
+
 void Demo::CreateSyncObjects()
 {
 	VkSemaphoreCreateInfo semaphoreInfo{};
@@ -688,8 +698,7 @@ void Demo::BuildShadowCommandBuffer()
 
 	vkCmdBeginRenderPass(ShadowCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	VkViewport viewport = initializers::viewport((float)shadow_pass.mWidth, (float)shadow_pass.mHeight, 0.0f, 1.0f);
-	vkCmdSetViewport(ShadowCommandBuffer, 0, 1, &viewport);
+	vkCmdSetViewport(ShadowCommandBuffer, 0, 1, &commonViewport);
 
 	VkRect2D scissor = initializers::rect2D(shadow_pass.mWidth, shadow_pass.mHeight, 0, 0);
 	vkCmdSetScissor(ShadowCommandBuffer, 0, 1, &scissor);
@@ -737,8 +746,7 @@ void Demo::BuildGCommandBuffer()
 
 		vkCmdBeginRenderPass(GCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	VkViewport viewport = initializers::viewport((float)geometry_pass.mWidth, (float)geometry_pass.mHeight, 0.0f, 1.0f);
-	vkCmdSetViewport(GCommandBuffer, 0, 1, &viewport);
+	vkCmdSetViewport(GCommandBuffer, 0, 1, &commonViewport);
 
 	VkRect2D scissor = initializers::rect2D(geometry_pass.mWidth, geometry_pass.mHeight, 0, 0);
 	vkCmdSetScissor(GCommandBuffer, 0, 1, &scissor);
@@ -790,10 +798,11 @@ void Demo::BuildLightCommandBuffer()
 
 	VK_CHECK_RESULT(vkBeginCommandBuffer(LightingCommandBuffer, &cmdBufInfo))
 		vkCmdBeginRenderPass(LightingCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-	VkViewport viewport = initializers::viewport((float)lighting_pass.mWidth, (float)lighting_pass.mHeight, 0.f, 1.f);
-	vkCmdSetViewport(LightingCommandBuffer, 0, 1, &viewport);
+
 	VkRect2D scissor = initializers::rect2D(lighting_pass.mWidth, lighting_pass.mHeight, 0, 0);
 	vkCmdSetScissor(LightingCommandBuffer, 0, 1, &scissor);
+
+	vkCmdSetViewport(LightingCommandBuffer, 0, 1, &commonViewport);
 
 	vkCmdBindDescriptorSets(LightingCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, lighting_pass.mPipelineLayout, 0, 1, &lighting_pass.mDescriptorSet, 0, nullptr);
 
@@ -826,8 +835,7 @@ void Demo::BuildPostCommandBuffer(int swapChianIndex)
 
 	vkCmdBeginRenderPass(PostCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	VkViewport viewport = initializers::viewport((float)post_pass.mWidth, (float)post_pass.mHeight, 0.0f, 1.0f);
-	vkCmdSetViewport(PostCommandBuffer, 0, 1, &viewport);
+	vkCmdSetViewport(PostCommandBuffer, 0, 1, &commonViewport);
 
 	VkRect2D scissor = initializers::rect2D(post_pass.mWidth, post_pass.mHeight, 0, 0);
 	vkCmdSetScissor(PostCommandBuffer, 0, 1, &scissor);
@@ -878,7 +886,6 @@ void Demo::UpdateUniformBuffer()
 	UniformBufferMat ubo{};
 	ubo.view = camera->getViewMatrix();
 	ubo.proj = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 0.1f, 500.f);
-	ubo.proj[1][1] *= -1;
 
 	float radius = 5.f;
 	float rotateAmount = 0.f;
@@ -895,7 +902,6 @@ void Demo::UpdateUniformBuffer()
 	glm::vec3 lightPos = lightsData.point_light[0].mPos + glm::vec3(0.f, 5.f, 0.f);
 	glm::mat4 lightProjection = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 1.f, 96.f);
 	//glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.f, 100.f);
-	lightProjection[1][1] *= -1;
 	glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 	lightMatData.lightMVP = lightProjection * lightView;
 
