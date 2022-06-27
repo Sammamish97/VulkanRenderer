@@ -35,7 +35,6 @@ private:
 	void LoadTextures();
 	void CreateLight();
 	void CreateCamera();
-	void CreateViewport();
 	void CreateSyncObjects();
 	void LoadCubemap(std::string filename, VkFormat format, bool forceLinearTiling);
 
@@ -84,7 +83,6 @@ private:
 	Mesh* Skybox;
 
 	Camera* camera;
-	VkViewport commonViewport;
 	UniformBufferLights lightsData;
 	LightMatUBO lightMatData;
 	VkDescriptorPool descriptorPool;

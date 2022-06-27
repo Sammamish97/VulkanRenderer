@@ -29,7 +29,7 @@ layout (binding = 1) uniform PointLightsUBO {
 float ShadowCalc(vec4 shadowCoord)
 {
     float shadow = 1.0;
-    vec2 uv = vec2(shadowCoord.x, shadowCoord.y);
+    vec2 uv = vec2(shadowCoord.x, -shadowCoord.y);
     float currentDepth = shadowCoord.z;
 	if ( currentDepth > -1.0 && currentDepth < 1.0 ) 
 	{
@@ -53,6 +53,7 @@ void main()
     // Shadow values
     vec4 lightSpaceFragPos = LightMat.lightMVP * vec4(fragPos, 1.0);
     lightSpaceFragPos /= lightSpaceFragPos.w;
+    lightSpaceFragPos.y = -lightSpaceFragPos.y;
 
     float shadow = ShadowCalc(lightSpaceFragPos);
 
@@ -75,4 +76,5 @@ void main()
     }
 
     outFragcolor = vec4(result, 1.0f);
+
 }
