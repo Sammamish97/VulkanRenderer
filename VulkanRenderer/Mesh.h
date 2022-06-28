@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_core.h>
 #include <array>
@@ -21,7 +22,7 @@ struct Mesh
 public:
 	std::vector<Vertex> vertices;
 	bool loadAndCreateMesh(const char* filename, VulkanDevice* vulkan_device, glm::vec3 assignedColor);
-	bool loadFromObj(const char* filename, glm::vec3 assignedColor);
+	bool loadFromObj(const char* filename, glm::vec3 assignedColor, bool flip_y = true);
 	void createVertexBuffer(VulkanDevice* vulkanDevice);
 	~Mesh();
 	//TODO: 소멸자 혹은 destroy를 통해 Buffer들을 할당 해제 해야함!

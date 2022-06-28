@@ -37,7 +37,7 @@ std::array<VkVertexInputAttributeDescription, 3> Vertex::getAttributeDescription
 
 /*******************************************************************/
 
-bool Mesh::loadFromObj(const char* filename, glm::vec3 assignedColor)
+bool Mesh::loadFromObj(const char* filename, glm::vec3 assignedColor, bool flip_y)
 {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -86,14 +86,23 @@ bool Mesh::loadFromObj(const char* filename, glm::vec3 assignedColor)
 				tinyobj::real_t UV_u = attrib.texcoords[2 * idx.texcoord_index + 0];
 				tinyobj::real_t UV_v = attrib.texcoords[2 * idx.texcoord_index + 1];
 
+				
 				//copy it into our vertex
 				Vertex new_vert;
+				if (flip_y == true)
+				{
+					new_vert.position.y = -vy;
+					new_vert.normal.y = -ny;
+				}
+				else
+				{
+					new_vert.position.y = vy;
+					new_vert.normal.y = ny;
+				}
 				new_vert.position.x = vx;
-				new_vert.position.y = vy;
 				new_vert.position.z = vz;
 
 				new_vert.normal.x = nx;
-				new_vert.normal.y = ny;
 				new_vert.normal.z = nz;
 
 				new_vert.UV.x = UV_u;
@@ -120,7 +129,7 @@ void Mesh::createVertexBuffer(VulkanDevice* vulkanDevice)
 
 bool Mesh::loadAndCreateMesh(const char* filename, VulkanDevice* vulkan_device, glm::vec3 assignedColor)
 {
-	loadFromObj(filename, assignedColor);
+	loadFromObj(filename, assignedColor, false);
 	createVertexBuffer(vulkan_device);
 	logicalDevice = vulkan_device->logicalDevice;
 	return true;

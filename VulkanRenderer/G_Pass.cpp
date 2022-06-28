@@ -2,6 +2,8 @@
 #include "VkApp.h"
 #include "VulkanInitializers.hpp"
 #include "VulkanTools.h"
+
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
 #include "Mesh.h"
