@@ -235,9 +235,8 @@ void Demo::LoadMeshAndObjects()
 	Skybox->loadAndCreateMesh("../models/Skybox.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
 	objects.push_back(new Object(redMesh, glm::vec3(0.f, 3.f, 3.f)));
-	/*objects.push_back(new Object(greenMesh, glm::vec3(3.f, 3.f, 0.f)));
+	objects.push_back(new Object(greenMesh, glm::vec3(3.f, 3.f, 0.f)));
 	objects.push_back(new Object(BlueMesh, glm::vec3(-3.f, 3.f, 0.f)));
-	objects.push_back(new Object(greenMesh, glm::vec3(0.f, 3.f, 0.f)));*/
 	objects.push_back(new Object(floor, glm::vec3(0, 0.0, 0)));
 }
 
@@ -892,7 +891,7 @@ void Demo::UpdateUniformBuffer()
 
 	//Calculate shadowing view & projection mat
 
-	glm::vec3 lightPos = lightsData.point_light[0].mPos + glm::vec3(0.f, 5.f, 0.f);
+	glm::vec3 lightPos = lightsData.point_light[0].mPos + glm::vec3(0.f, 15.f, 0.f);
 	glm::mat4 lightProjection = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 1.f, 96.f);
 	lightProjection[1][1] *= -1;
 	glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
