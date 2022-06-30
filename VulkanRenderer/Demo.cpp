@@ -234,10 +234,10 @@ void Demo::LoadMeshAndObjects()
 	Skybox = new Mesh;
 	Skybox->loadAndCreateMesh("../models/Skybox.obj", mVulkanDevice, glm::vec3(0.8, 0.8, 0.8));
 
-	/*objects.push_back(new Object(redMesh, glm::vec3(0.f, 3.f, 3.f)));
-	objects.push_back(new Object(greenMesh, glm::vec3(3.f, 3.f, 0.f)));
-	objects.push_back(new Object(BlueMesh, glm::vec3(-3.f, 3.f, 0.f)));*/
-	objects.push_back(new Object(greenMesh, glm::vec3(0.f, 3.f, 0.f)));
+	objects.push_back(new Object(redMesh, glm::vec3(0.f, 3.f, 3.f)));
+	/*objects.push_back(new Object(greenMesh, glm::vec3(3.f, 3.f, 0.f)));
+	objects.push_back(new Object(BlueMesh, glm::vec3(-3.f, 3.f, 0.f)));
+	objects.push_back(new Object(greenMesh, glm::vec3(0.f, 3.f, 0.f)));*/
 	objects.push_back(new Object(floor, glm::vec3(0, 0.0, 0)));
 }
 
@@ -436,7 +436,7 @@ void Demo::CreateLight()
 
 void Demo::CreateCamera()
 {
-	camera = new Camera(glm::vec3(0, 0, 5), glm::vec3(0, 1, 0));
+	camera = new Camera(glm::vec3(10, 10, 0), glm::vec3(0, 1, 0));
 }
 
 void Demo::CreateSyncObjects()
@@ -878,8 +878,8 @@ void Demo::UpdateUniformBuffer()
 	UniformBufferMat ubo{};
 	ubo.view = camera->getViewMatrix();
 	ubo.proj = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 0.1f, 500.f);
-
-	float radius = 5.f;
+	ubo.proj[1][1] *= -1;
+	float radius = 10.f;
 	float rotateAmount = 0.f;
 	if (RotatingLight == true)
 	{
@@ -891,12 +891,15 @@ void Demo::UpdateUniformBuffer()
 	}
 
 	//Calculate shadowing view & projection mat
+
 	glm::vec3 lightPos = lightsData.point_light[0].mPos + glm::vec3(0.f, 5.f, 0.f);
 	glm::mat4 lightProjection = glm::perspective(glm::radians(45.f), mSwapChain->mSwapChainExtent.width / (float)mSwapChain->mSwapChainExtent.height, 1.f, 96.f);
-	//glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.f, 100.f);
+	lightProjection[1][1] *= -1;
 	glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-	lightMatData.lightMVP = lightProjection * lightView;
 
+	lightMatData.lightMVP = lightProjection * lightView;
+	//lightMatData.lightMVP = ubo.proj * ubo.view;
+	
 	//Update data
 	void* Matdata;
 	vkMapMemory(mVulkanDevice->logicalDevice, matUBO.memory, 0, sizeof(ubo), 0, &Matdata);

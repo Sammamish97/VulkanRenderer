@@ -34,7 +34,7 @@ float ShadowCalc(vec4 shadowCoord)
 	if ( currentDepth > -1.0 && currentDepth < 1.0 ) 
 	{
 		float closestDepth = texture( shadowDepth, uv).r;
-		if ( shadowCoord.w > 0.0 && closestDepth < currentDepth ) 
+		if ( shadowCoord.w > 0.0 && closestDepth < (currentDepth-0.005) ) 
 		{
 			shadow = 0.0;
 		}
@@ -52,7 +52,8 @@ void main()
 
     // Shadow values
     vec4 lightSpaceFragPos = LightMat.lightMVP * vec4(fragPos, 1.0);
-    lightSpaceFragPos /= lightSpaceFragPos.w;
+    lightSpaceFragPos.xyz /= lightSpaceFragPos.w;
+    lightSpaceFragPos.xy = lightSpaceFragPos.xy * 0.5 + 0.5;
 
     float shadow = ShadowCalc(lightSpaceFragPos);
 
