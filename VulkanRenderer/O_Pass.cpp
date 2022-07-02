@@ -1,4 +1,4 @@
-#include "L_Pass.h"
+#include "O_Pass.h"
 #include "VkApp.h"
 #include "VulkanInitializers.hpp"
 #include "VulkanTools.h"
@@ -8,53 +8,54 @@
 
 #include "Mesh.h"
 
-void L_Pass::Init(VkApp* app, uint32_t width, uint32_t height)
+//TODO
+//1. Blur를 위한 compute shader생각해야함
+void O_Pass::Init(VkApp* app, uint32_t width, uint32_t height)
 {
 	mApp = app;
 	mWidth = width;
 	mHeight = height;
 }
 
-void L_Pass::CreateFrameData()
+void O_Pass::CreateFrameData()
 {
 	CreateAttachment();
 	CreateRenderPass();
 	CreateFrameBuffer();
 }
 
-void L_Pass::CreatePipelineData()
+void O_Pass::CreatePipelineData()
 {
 	CreatePipelineLayout();
 	CreatePipeline();
 }
 
-void L_Pass::CreateAttachment()
+void O_Pass::CreateAttachment()
 {
-	VkImageUsageFlagBits lightAttachmentUsage = static_cast<VkImageUsageFlagBits>(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-	mApp->CreateAttachment(VK_FORMAT_B8G8R8A8_SRGB, lightAttachmentUsage, &mComposition);
+	mApp->CreateAttachment(VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &mOcclusion);
 }
 
-void L_Pass::CreateRenderPass()
+void O_Pass::CreateRenderPass()
 {
-	VkAttachmentDescription compositionDesc = {};
-	compositionDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-	compositionDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	compositionDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	compositionDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	compositionDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	VkAttachmentDescription occlusionDesc = {};
+	occlusionDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	occlusionDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	occlusionDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	occlusionDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	occlusionDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
-	compositionDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	compositionDesc.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	occlusionDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	occlusionDesc.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-	compositionDesc.format = mComposition.format;
+	occlusionDesc.format = mOcclusion.format;
 
-	VkAttachmentReference compositionReference = {};
-	compositionReference.attachment = 0;
-	compositionReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	VkAttachmentReference occlusionReference = {};
+	occlusionReference.attachment = 0;
+	occlusionReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	VkSubpassDescription subpass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.pColorAttachments = &compositionReference;
+	subpass.pColorAttachments = &occlusionReference;
 	subpass.colorAttachmentCount = 1;
 	subpass.pDepthStencilAttachment = VK_NULL_HANDLE;
 
@@ -88,7 +89,7 @@ void L_Pass::CreateRenderPass()
 
 	VkRenderPassCreateInfo renderPassInfo = {};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassInfo.pAttachments = &compositionDesc;
+	renderPassInfo.pAttachments = &occlusionDesc;
 	renderPassInfo.attachmentCount = 1;
 	renderPassInfo.subpassCount = 1;
 	renderPassInfo.pSubpasses = &subpass;
@@ -97,9 +98,9 @@ void L_Pass::CreateRenderPass()
 	VK_CHECK_RESULT(vkCreateRenderPass(mApp->mVulkanDevice->logicalDevice, &renderPassInfo, nullptr, &mRenderPass))
 }
 
-void L_Pass::CreateFrameBuffer()
+void O_Pass::CreateFrameBuffer()
 {
-	VkImageView attachment = mComposition.view;
+	VkImageView attachment = mOcclusion.view;
 
 	VkFramebufferCreateInfo fbufCreateInfo = {};
 	fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -110,11 +111,13 @@ void L_Pass::CreateFrameBuffer()
 	fbufCreateInfo.width = mWidth;
 	fbufCreateInfo.height = mHeight;
 	fbufCreateInfo.layers = 1;
-	VK_CHECK_RESULT(vkCreateFramebuffer(mApp->mVulkanDevice->logicalDevice, &fbufCreateInfo, nullptr, &mFrameBuffer));
+	VK_CHECK_RESULT(vkCreateFramebuffer(mApp->mVulkanDevice->logicalDevice, &fbufCreateInfo, nullptr, &mFrameBuffer))
 }
 
-void L_Pass::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize>& poolSizes)
+void O_Pass::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize>& poolSizes)
 {
+	//SSAO pass use position, normal texture from G-Pass
+	//Later, use noise texture
 	VkDescriptorPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
@@ -128,13 +131,13 @@ void L_Pass::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize>& poolS
 	}
 }
 
-void L_Pass::CreateDescriptorLayout(const std::vector<VkDescriptorSetLayoutBinding>& setLayoutBindings)
+void O_Pass::CreateDescriptorLayout(const std::vector<VkDescriptorSetLayoutBinding>& setLayoutBindings)
 {
 	VkDescriptorSetLayoutCreateInfo lightDescriptorLayout = initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(mApp->mVulkanDevice->logicalDevice, &lightDescriptorLayout, nullptr, &mDescriptorLayout))
 }
 
-void L_Pass::CreateDescriptorSet()
+void O_Pass::CreateDescriptorSet()
 {
 	VkDescriptorSetAllocateInfo setAllocInfo{};
 	setAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -148,18 +151,18 @@ void L_Pass::CreateDescriptorSet()
 	}
 }
 
-void L_Pass::UpdateDescriptorSet(const std::vector<VkWriteDescriptorSet>& writeDescSets)
+void O_Pass::UpdateDescriptorSet(const std::vector<VkWriteDescriptorSet>& writeDescSets)
 {
 	vkUpdateDescriptorSets(mApp->mVulkanDevice->logicalDevice, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
 }
 
-void L_Pass::CreatePipelineLayout()
+void O_Pass::CreatePipelineLayout()
 {
 	VkPipelineLayoutCreateInfo LightpipelineLayoutCreateInfo = initializers::pipelineLayoutCreateInfo(&mDescriptorLayout, 1);
 	VK_CHECK_RESULT(vkCreatePipelineLayout(mApp->mVulkanDevice->logicalDevice, &LightpipelineLayoutCreateInfo, nullptr, &mPipelineLayout))
 }
 
-void L_Pass::CreatePipeline()
+void O_Pass::CreatePipeline()
 {
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyState =
 		initializers::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
@@ -191,15 +194,15 @@ void L_Pass::CreatePipeline()
 	pipelineCI.pDynamicState = &dynamicState;
 	pipelineCI.stageCount = static_cast<uint32_t>(shaderStages.size());
 	pipelineCI.pStages = shaderStages.data();
-	
+
 	shaderStages[0] = createShaderStageCreateInfo("../shaders/QuadVert.spv", VK_SHADER_STAGE_VERTEX_BIT, mApp->mVulkanDevice->logicalDevice);
-	shaderStages[1] = createShaderStageCreateInfo("../shaders/LightingFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mApp->mVulkanDevice->logicalDevice);
+	shaderStages[1] = createShaderStageCreateInfo("../shaders/SSAOFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT, mApp->mVulkanDevice->logicalDevice);
 
 	VkPipelineVertexInputStateCreateInfo emptyInput = initializers::pipelineVertexInputStateCreateInfo();
 	pipelineCI.pVertexInputState = &emptyInput;
 	VK_CHECK_RESULT(vkCreateGraphicsPipelines(mApp->mVulkanDevice->logicalDevice, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &mPipeline))
 }
 
-void L_Pass::Update()
+void O_Pass::Update()
 {
 }

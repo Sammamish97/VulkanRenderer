@@ -9,6 +9,7 @@
 #include "G_Pass.h"
 #include "L_Pass.h"
 #include "P_Pass.h"
+#include "O_Pass.h"
 
 struct MouseInfo
 {
@@ -54,6 +55,7 @@ private:
 
 	void BuildShadowCommandBuffer();
 	void BuildGCommandBuffer();
+	void BuildOCommandBuffer();
 	void BuildLightCommandBuffer();
 	void BuildPostCommandBuffer(int swapChianIndex);
 
@@ -103,15 +105,18 @@ private:
 	G_Pass geometry_pass;
 	L_Pass lighting_pass;
 	P_Pass post_pass;
+	O_Pass occlusion_pass; 
 
 	VkCommandBuffer ShadowCommandBuffer;
 	VkCommandBuffer GCommandBuffer;
+	VkCommandBuffer OCommandBuffer; 
 	VkCommandBuffer LightingCommandBuffer;
 	VkCommandBuffer PostCommandBuffer;
 
 //Synchronize
 	VkSemaphore ShadowComplete;
 	VkSemaphore GBufferComplete;
+	VkSemaphore OcculusionComplete;
 	VkSemaphore renderComplete;
 	VkSemaphore PostComplete;
 	VkSemaphore presentComplete;

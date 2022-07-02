@@ -113,6 +113,9 @@
     <ClCompile Include="S_Pass.cpp">
       <Filter>Pass</Filter>
     </ClCompile>
+    <ClCompile Include="O_Pass.cpp">
+      <Filter>Pass</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h">
@@ -172,6 +175,9 @@
     <ClInclude Include="S_Pass.h">
       <Filter>Pass</Filter>
     </ClInclude>
+    <ClInclude Include="O_Pass.h">
+      <Filter>Pass</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\shaders\GBuffer.frag">
@@ -181,9 +187,6 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="..\shaders\Lighting.frag">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="..\shaders\Lighting.vert">
       <Filter>Shaders</Filter>
     </None>
     <None Include="..\shaders\Base.frag">
@@ -205,6 +208,9 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="..\shaders\Shadow.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\shaders\SSAO.frag">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

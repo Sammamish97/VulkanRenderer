@@ -30,6 +30,7 @@ void Demo::Init()
 
 	shadow_pass.Init(this, WIDTH, HEIGHT);
 	geometry_pass.Init(this, WIDTH, HEIGHT);
+	occlusion_pass.Init(this, WIDTH, HEIGHT);
 	lighting_pass.Init(this, WIDTH, HEIGHT);
 	post_pass.Init(this, WIDTH, HEIGHT, &lighting_pass.mComposition, &geometry_pass.mDepth);
 
@@ -42,6 +43,9 @@ void Demo::Init()
 
 	geometry_pass.CreateFrameData();
 	geometry_pass.CreatePipelineData();
+
+	occlusion_pass.CreateFrameData();
+	occlusion_pass.CreatePipelineData();
 
 	lighting_pass.CreateFrameData();
 	lighting_pass.CreatePipelineData();
@@ -88,6 +92,7 @@ void Demo::Draw()
 	UpdateDescriptorSet();
 	BuildShadowCommandBuffer();
 	BuildGCommandBuffer();
+	BuildOCommandBuffer();
 	BuildLightCommandBuffer();//TODO: Can transfer to Init. Not draw.
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
@@ -114,7 +119,6 @@ void Demo::Draw()
 	SSubmitInfo.commandBufferCount = 1;
 	SSubmitInfo.pCommandBuffers = &ShadowCommandBuffer;
 	SSubmitInfo.pWaitDstStageMask = waitStages;
-
 	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &SSubmitInfo, nullptr))
 
 
@@ -127,12 +131,22 @@ void Demo::Draw()
 	GSubmitInfo.commandBufferCount = 1;
 	GSubmitInfo.pCommandBuffers = &GCommandBuffer;
 	GSubmitInfo.pWaitDstStageMask = waitStages;
-
 	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &GSubmitInfo, nullptr))
+
+	VkSubmitInfo occulusionSubmitInfo = {};
+	occulusionSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	occulusionSubmitInfo.pWaitSemaphores = &GBufferComplete;
+	occulusionSubmitInfo.waitSemaphoreCount = 1;
+	occulusionSubmitInfo.pSignalSemaphores = &OcculusionComplete;
+	occulusionSubmitInfo.signalSemaphoreCount = 1;
+	occulusionSubmitInfo.commandBufferCount = 1;
+	occulusionSubmitInfo.pCommandBuffers = &OCommandBuffer;
+	occulusionSubmitInfo.pWaitDstStageMask = waitStages;
+	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &occulusionSubmitInfo, nullptr))
 
 	VkSubmitInfo lightSubmitInfo = {};
 	lightSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	lightSubmitInfo.pWaitSemaphores = &GBufferComplete;
+	lightSubmitInfo.pWaitSemaphores = &OcculusionComplete;
 	lightSubmitInfo.waitSemaphoreCount = 1;
 	lightSubmitInfo.pSignalSemaphores = &renderComplete;
 	lightSubmitInfo.signalSemaphoreCount = 1;
@@ -141,7 +155,6 @@ void Demo::Draw()
 	lightSubmitInfo.pWaitDstStageMask = waitStages;
 	VK_CHECK_RESULT(vkQueueSubmit(mGraphicsQueue, 1, &lightSubmitInfo, nullptr))
 
-	
 	BuildPostCommandBuffer(0);
 	VkSubmitInfo postSubmitInfo = {};
 	postSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -452,6 +465,7 @@ void Demo::CreateSyncObjects()
 		vkCreateSemaphore(mVulkanDevice->logicalDevice, &semaphoreInfo, nullptr, &presentComplete) != VK_SUCCESS ||
 		vkCreateSemaphore(mVulkanDevice->logicalDevice, &semaphoreInfo, nullptr, &PostComplete) != VK_SUCCESS ||
 		vkCreateSemaphore(mVulkanDevice->logicalDevice, &semaphoreInfo, nullptr, &ShadowComplete) != VK_SUCCESS ||
+		vkCreateSemaphore(mVulkanDevice->logicalDevice, &semaphoreInfo, nullptr, &OcculusionComplete) != VK_SUCCESS ||
 		vkCreateFence(mVulkanDevice->logicalDevice, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to create semaphores!");
@@ -526,6 +540,11 @@ void Demo::CreateCommandBuffers()
 	{
 		throw std::runtime_error("failed to allocate command buffers!");
 	}
+
+	if (vkAllocateCommandBuffers(mVulkanDevice->logicalDevice, &allocInfo, &OCommandBuffer) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to allocate command buffers!");
+	}
 }
 
 void Demo::InitDescriptorPool()
@@ -560,11 +579,13 @@ void Demo::InitDescriptorPool()
 
 	std::vector<VkDescriptorPoolSize> sPoolSizes = { shadowMatSize };
 	std::vector<VkDescriptorPoolSize> gPoolSizes = { matPoolsize, ModelTexturesSize };
+	std::vector<VkDescriptorPoolSize> oPoolSizes = { GBufferAttachmentSize };
 	std::vector<VkDescriptorPoolSize> lPoolSizes = { Lightpoolsize, GBufferAttachmentSize, shadowMatSize, ShadowDepthTextureSize };
 	std::vector<VkDescriptorPoolSize> pPoolSizes = { matPoolsize, cubemapSize };
 	
 	shadow_pass.CreateDescriptorPool(sPoolSizes);
 	geometry_pass.CreateDescriptorPool(gPoolSizes);
+	occlusion_pass.CreateDescriptorPool(oPoolSizes);
 	lighting_pass.CreateDescriptorPool(lPoolSizes);
 	post_pass.CreateDescriptorPool(pPoolSizes);
 }
@@ -642,6 +663,9 @@ void Demo::InitDescriptorLayout()
 	std::vector<VkDescriptorSetLayoutBinding> GLayoutBinding = { matLayoutBinding, diffuseTextureBinding };
 	geometry_pass.CreateDescriptorLayout(GLayoutBinding);
 
+	std::vector<VkDescriptorSetLayoutBinding> OLayoutBindings = { positionTextureBinding, normalTextureBinding, albedoTextureBinding };
+	occlusion_pass.CreateDescriptorLayout(OLayoutBindings);
+
 	std::vector<VkDescriptorSetLayoutBinding> LLayoutBindings = { lightLayoutBinding, positionTextureBinding, normalTextureBinding, albedoTextureBinding, lightMVPBinding, shadowDepthbinding };
 	lighting_pass.CreateDescriptorLayout(LLayoutBindings);
 
@@ -655,6 +679,8 @@ void Demo::InitDescriptorLayout()
 void Demo::InitDescriptorSet()
 {
 	geometry_pass.CreateDescriptorSet();
+
+	occlusion_pass.CreateDescriptorSet();
 
 	lighting_pass.CreateDescriptorSet();
 
@@ -768,12 +794,48 @@ void Demo::BuildGCommandBuffer()
 	VK_CHECK_RESULT(vkEndCommandBuffer(GCommandBuffer));
 }
 
+void Demo::BuildOCommandBuffer()
+{
+	VkCommandBufferBeginInfo cmdBufInfo = initializers::commandBufferBeginInfo();
+
+	VkClearValue clearValues[1];
+	clearValues[0].color = { { 0.0f, 0.0f, 0.0f, 0.0f } };
+
+	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
+	renderPassBeginInfo.renderPass = occlusion_pass.mRenderPass;
+	renderPassBeginInfo.renderArea.offset.x = 0;
+	renderPassBeginInfo.renderArea.offset.y = 0;
+	renderPassBeginInfo.renderArea.extent.width = occlusion_pass.mWidth;
+	renderPassBeginInfo.renderArea.extent.height = occlusion_pass.mHeight;
+	renderPassBeginInfo.clearValueCount = 1;
+	renderPassBeginInfo.pClearValues = clearValues;
+
+	renderPassBeginInfo.framebuffer = occlusion_pass.mFrameBuffer;
+
+	VK_CHECK_RESULT(vkBeginCommandBuffer(OCommandBuffer, &cmdBufInfo))
+		vkCmdBeginRenderPass(OCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+	VkViewport viewport = initializers::viewport((float)occlusion_pass.mWidth, (float)occlusion_pass.mHeight, 0.f, 1.f);
+	vkCmdSetViewport(OCommandBuffer, 0, 1, &viewport);
+	VkRect2D scissor = initializers::rect2D(occlusion_pass.mWidth, occlusion_pass.mHeight, 0, 0);
+	vkCmdSetScissor(OCommandBuffer, 0, 1, &scissor);
+
+	vkCmdBindDescriptorSets(OCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, occlusion_pass.mPipelineLayout, 0, 1, &occlusion_pass.mDescriptorSet, 0, nullptr);
+
+	vkCmdBindPipeline(OCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, occlusion_pass.mPipeline);
+	vkCmdDraw(OCommandBuffer, 3, 1, 0, 0);
+
+	vkCmdEndRenderPass(OCommandBuffer);
+
+	VK_CHECK_RESULT(vkEndCommandBuffer(OCommandBuffer));
+}
+
+
 void Demo::BuildLightCommandBuffer()
 {
 	VkCommandBufferBeginInfo cmdBufInfo = initializers::commandBufferBeginInfo();
 
 	VkClearValue clearValues[2];
-	clearValues[0].color = { {0.f, 0.f, 0.2f, 0.f} };
+	clearValues[0].color = { {0.f, 0.f, 0.0f, 0.f} };
 	clearValues[1].depthStencil = { 1.f, 0 };
 
 	VkRenderPassBeginInfo renderPassBeginInfo = initializers::renderPassBeginInfo();
@@ -970,6 +1032,14 @@ void Demo::UpdateDescriptorSet()
 		initializers::writeDescriptorSet(geometry_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5, &modelDiffuseDisc)
 	};
 	geometry_pass.UpdateDescriptorSet(GBufWriteDescriptorSets);
+
+	std::vector<VkWriteDescriptorSet> OcclusionDescriptorSets;
+	OcclusionDescriptorSets = {
+		initializers::writeDescriptorSet(occlusion_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &texPosDisc),
+		initializers::writeDescriptorSet(occlusion_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &texNormalDisc),
+		initializers::writeDescriptorSet(occlusion_pass.mDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &texColorDisc),
+	};
+	occlusion_pass.UpdateDescriptorSet(OcclusionDescriptorSets);
 
 	std::vector<VkWriteDescriptorSet> lightWriteDescriptorSets;
 	lightWriteDescriptorSets = {

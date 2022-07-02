@@ -183,6 +183,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Object.cpp" />
+    <ClCompile Include="O_Pass.cpp" />
     <ClCompile Include="PointLight.cpp" />
     <ClCompile Include="P_Pass.cpp" />
     <ClCompile Include="SwapChain.cpp" />
@@ -202,6 +203,7 @@
     <ClInclude Include="L_Pass.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Object.h" />
+    <ClInclude Include="O_Pass.h" />
     <ClInclude Include="PointLight.h" />
     <ClInclude Include="P_Pass.h" />
     <ClInclude Include="SwapChain.h" />
@@ -219,12 +221,12 @@
     <None Include="..\shaders\GBuffer.frag" />
     <None Include="..\shaders\GBuffer.vert" />
     <None Include="..\shaders\Lighting.frag" />
-    <None Include="..\shaders\Lighting.vert" />
     <None Include="..\shaders\NormalDebug.geom" />
     <None Include="..\shaders\Shadow.frag" />
     <None Include="..\shaders\Shadow.vert" />
     <None Include="..\shaders\Skybox.frag" />
     <None Include="..\shaders\Skybox.vert" />
+    <None Include="..\shaders\SSAO.frag" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

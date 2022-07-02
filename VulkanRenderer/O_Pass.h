@@ -3,10 +3,11 @@
 #include "Attachment.h"
 
 class VkApp;
-class L_Pass
+class O_Pass
 {
 private:
 	VkApp* mApp = nullptr;
+
 public:
 	void Init(VkApp* app, uint32_t width, uint32_t height);
 	void Update();
@@ -33,7 +34,7 @@ public:
 
 	VkFramebuffer mFrameBuffer;
 	VkRenderPass mRenderPass;
-	FrameBufferAttachment mComposition;
+	FrameBufferAttachment mOcclusion;
 
 	VkDescriptorPool mDescriptorPool;
 	VkDescriptorSetLayout mDescriptorLayout;
